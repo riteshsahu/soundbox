@@ -3,7 +3,7 @@
     <string name="brand_accessibility">SoundBox, payment announcement helper</string>
     <string name="switch_language">हिन्दी</string>
     <string name="switch_language_accessibility">Switch the app language to Hindi</string>
-    <string name="stage_notice">Foundation stage · payment listening is not active</string>
+    <string name="stage_notice">Payment announcements are always in Hindi</string>
     <string name="home_title">Welcome</string>
     <string name="home_subtitle">Check SoundBox status here.</string>
     <string name="listening_status">Listening status</string>
@@ -53,4 +53,25 @@
     <string name="nav_setup">Setup</string>
     <string name="nav_history">History</string>
     <string name="selected_format">%1$s, selected</string>
+    <string name="listener_ready">Notification access is on</string>
+    <string name="listener_not_ready">Notification access is off</string>
+    <string name="announcement_setting">Payment announcements</string>
+    <string name="announcements_enabled">Payment announcements are on</string>
+    <string name="announcements_disabled">Payment announcements are off</string>
+    <string name="announcements_switch_label">Speak received payments</string>
+    <string name="enable_notification_access">Open notification access settings</string>
+    <string name="notification_access_steps">In Android Settings, enable notification access for SoundBox. Android will ask for this permission on its system settings page.</string>
+    <string name="offline_voice_ready">Offline Hindi voice is ready</string>
+    <string name="offline_voice_missing">Offline Hindi voice is unavailable</string>
+    <string name="voice_checking">Checking Hindi voice…</string>
+    <string name="test_speech">Test the Hindi voice</string>
+    <string name="open_voice_settings">Open Hindi voice data settings</string>
+    <string name="test_speech_phrase">पाँच सौ रुपये प्राप्त हुए</string>
+    <string name="listening_active">Listening is on</string>
+    <string name="listening_needs_setup">Setup is not complete</string>
+    <string name="ready_voice_and_access">Notification access and Hindi voice are ready</string>
+    <string name="notification_access_scope">Android may make notifications from other apps visible to this service. SoundBox skips non-allowlisted packages before reading their content.</string>
+    <string name="allowlist_privacy">Only notifications from the selected Google Pay, PhonePe, and Paytm package IDs are checked.</string>
+    <string name="local_only_no_notification_text">Notification text is not saved or logged. Payment history is not stored yet.</string>
+    <string name="voice_settings_unavailable">Hindi voice data settings could not be opened. Open the phone’s text-to-speech settings instead.</string>
 </resources>

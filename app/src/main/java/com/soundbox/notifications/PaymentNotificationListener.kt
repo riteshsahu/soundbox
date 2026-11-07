@@ -1,0 +1,68 @@
+package com.soundbox.notifications
+
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.service.notification.NotificationListenerService
+import android.service.notification.StatusBarNotification
+import android.app.Notification
+import android.os.Build
+import com.soundbox.AppPreferences
+import com.soundbox.speech.HindiPaymentPhrase
+import com.soundbox.speech.HindiSpeechController
+import com.soundbox.speech.SpeechActions
+
+class PaymentNotificationListener : NotificationListenerService() {
+    private lateinit var speechController: HindiSpeechController
+    private val deduplicator = RecentPaymentDeduplicator()
+    private val refreshVoiceReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            when (intent.action) {
+                SpeechActions.STOP_QUEUED_ANNOUNCEMENTS -> speechController.stopAll()
+                SpeechActions.REFRESH_LOCAL_HINDI_VOICE -> {
+                    speechController.shutdown()
+                    speechController = HindiSpeechController(applicationContext) { }
+                }
+            }
+        }
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        val filter = IntentFilter(SpeechActions.REFRESH_LOCAL_HINDI_VOICE)
+            .apply { addAction(SpeechActions.STOP_QUEUED_ANNOUNCEMENTS) }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(refreshVoiceReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("DEPRECATION")
+            registerReceiver(refreshVoiceReceiver, filter)
+        }
+        speechController = HindiSpeechController(applicationContext) { }
+    }
+
+    override fun onNotificationPosted(sbn: StatusBarNotification) {
+        // Reject every non-allowlisted package before accessing notification content.
+        val provider = PaymentProvider.fromPackageName(sbn.packageName) ?: return
+        if (!AppPreferences.announcementsEnabled(this)) return
+
+        val notification = sbn.notification ?: return
+        val extras = notification.extras ?: return
+        val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
+        val content = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()
+            ?.takeIf { it.isNotBlank() }
+            ?: extras.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty()
+
+        val payment = PaymentNotificationParser.parse(provider.packageName, title, content) ?: return
+        if (!deduplicator.shouldAnnounce(payment, sbn.postTime)) return
+
+        val phrase = HindiPaymentPhrase.received(payment.amountPaise) ?: return
+        speechController.speakHindi(phrase)
+    }
+
+    override fun onDestroy() {
+        unregisterReceiver(refreshVoiceReceiver)
+        if (::speechController.isInitialized) speechController.shutdown()
+        super.onDestroy()
+    }
+}

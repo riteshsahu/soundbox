@@ -3,7 +3,7 @@
     <string name="brand_accessibility">SoundBox, भुगतान सूचना साथी</string>
     <string name="switch_language">English</string>
     <string name="switch_language_accessibility">ऐप की भाषा English करें</string>
-    <string name="stage_notice">तैयारी का पहला चरण · भुगतान सुनना अभी चालू नहीं है</string>
+    <string name="stage_notice">भुगतान की आवाज़ हमेशा हिंदी में होगी</string>
     <string name="home_title">नमस्ते</string>
     <string name="home_subtitle">यहाँ से SoundBox की स्थिति देखें।</string>
     <string name="listening_status">सुनने की स्थिति</string>
@@ -53,4 +53,25 @@
     <string name="nav_setup">सेटअप</string>
     <string name="nav_history">इतिहास</string>
     <string name="selected_format">चयनित: %1$s</string>
+    <string name="listener_ready">सूचना ऐक्सेस चालू</string>
+    <string name="listener_not_ready">सूचना ऐक्सेस चालू नहीं है</string>
+    <string name="announcement_setting">भुगतान की आवाज़</string>
+    <string name="announcements_enabled">भुगतान की आवाज़ चालू</string>
+    <string name="announcements_disabled">भुगतान की आवाज़ बंद</string>
+    <string name="announcements_switch_label">प्राप्त भुगतान की आवाज़ सुनें</string>
+    <string name="enable_notification_access">सूचना ऐक्सेस सेटिंग खोलें</string>
+    <string name="notification_access_steps">Android सेटिंग में SoundBox को सूचना ऐक्सेस दें। Android यह अनुमति अपने सिस्टम पन्ने पर माँगेगा।</string>
+    <string name="offline_voice_ready">ऑफ़लाइन हिंदी आवाज़ तैयार</string>
+    <string name="offline_voice_missing">ऑफ़लाइन हिंदी आवाज़ उपलब्ध नहीं</string>
+    <string name="voice_checking">हिंदी आवाज़ जाँची जा रही है…</string>
+    <string name="test_speech">हिंदी आवाज़ सुनकर जाँचें</string>
+    <string name="open_voice_settings">हिंदी आवाज़ डेटा सेटिंग खोलें</string>
+    <string name="test_speech_phrase">पाँच सौ रुपये प्राप्त हुए</string>
+    <string name="listening_active">सुनना चालू है</string>
+    <string name="listening_needs_setup">सेटअप पूरा करना बाकी है</string>
+    <string name="ready_voice_and_access">सूचना ऐक्सेस और हिंदी आवाज़ तैयार</string>
+    <string name="notification_access_scope">Android इस अनुमति से अन्य ऐप की सूचनाएँ भी उपलब्ध करा सकता है। SoundBox सामग्री पढ़ने से पहले गैर-अनुमत पैकेज को छोड़ देता है।</string>
+    <string name="allowlist_privacy">केवल Google Pay, PhonePe और Paytm के लिए चुने गए पैकेज की जाँच होती है।</string>
+    <string name="local_only_no_notification_text">सूचना का मूल पाठ सहेजा या लॉग नहीं किया जाता। अभी भुगतान इतिहास संग्रहीत नहीं होता।</string>
+    <string name="voice_settings_unavailable">इस फ़ोन पर हिंदी आवाज़ डेटा सेटिंग नहीं खुल सकी। फ़ोन की टेक्स्ट-टू-स्पीच सेटिंग खोलें।</string>
 </resources>

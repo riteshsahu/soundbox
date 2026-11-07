@@ -1,32 +1,40 @@
 package com.soundbox
 
 import android.app.Activity
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.provider.Settings
+import android.speech.tts.TextToSpeech
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.Switch
 import android.widget.TextView
+import android.widget.Toast
 import java.util.Locale
+import com.soundbox.notifications.NotificationAccess
+import com.soundbox.speech.HindiSpeechController
+import com.soundbox.speech.SpeechActions
 
 class MainActivity : Activity() {
     private enum class Screen { HOME, SETUP, HISTORY }
 
-    companion object {
-        private const val PREFERENCES = "soundbox_preferences"
-        private const val UI_LANGUAGE = "ui_language"
-        private const val HINDI_LANGUAGE = "hi"
-        private const val ENGLISH_LANGUAGE = "en"
-    }
+    private var currentScreen = Screen.HOME
+    private var hindiVoiceReady = false
+    private var ttsCheckComplete = false
+    private var voiceSettingsOpened = false
+    private var speechControllerGeneration = 0
+    private var speechController: HindiSpeechController? = null
 
     override fun attachBaseContext(newBase: Context) {
-        val language = newBase.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
-            .getString(UI_LANGUAGE, HINDI_LANGUAGE) ?: HINDI_LANGUAGE
+        val language = AppPreferences.uiLanguage(newBase)
         val configuration = Configuration(newBase.resources.configuration).apply {
             setLocale(Locale.forLanguageTag(language))
         }
@@ -36,10 +44,28 @@ class MainActivity : Activity() {
     private lateinit var page: LinearLayout
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        initializeSpeechController()
         showScreen(Screen.HOME)
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (voiceSettingsOpened) {
+            voiceSettingsOpened = false
+            initializeSpeechController(refreshListenerService = true)
+        }
+        if (::page.isInitialized) showScreen(currentScreen)
+    }
+
+    override fun onDestroy() {
+        speechControllerGeneration++
+        speechController?.shutdown()
+        speechController = null
+        super.onDestroy()
+    }
+
     private fun showScreen(screen: Screen) {
+        currentScreen = screen
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(getColor(R.color.canvas))
@@ -111,8 +137,33 @@ class MainActivity : Activity() {
 
         val status = card(parent)
         addLabel(status, getString(R.string.listening_status))
-        addText(status, getString(R.string.listening_off), 24f, R.color.ink, medium = true)
-        addText(status, getString(R.string.setup_next_step), 16f, R.color.muted_ink)
+        val listeningReady = NotificationAccess.isEnabled(this) &&
+            AppPreferences.announcementsEnabled(this) && hindiVoiceReady
+        addText(
+            status,
+            getString(if (listeningReady) R.string.listening_active else R.string.listening_needs_setup),
+            24f,
+            R.color.ink,
+            medium = true
+        )
+        addText(
+            status,
+            getString(if (NotificationAccess.isEnabled(this)) R.string.listener_ready else R.string.listener_not_ready),
+            16f,
+            R.color.muted_ink
+        )
+        addText(
+            status,
+            getString(if (hindiVoiceReady) R.string.offline_voice_ready else R.string.offline_voice_missing),
+            16f,
+            R.color.muted_ink
+        )
+        addText(
+            status,
+            getString(if (AppPreferences.announcementsEnabled(this)) R.string.announcements_enabled else R.string.announcements_disabled),
+            16f,
+            R.color.muted_ink
+        )
         addAction(status, getString(R.string.view_setup), primary = true) { showScreen(Screen.SETUP) }
 
         val total = card(parent)
@@ -134,35 +185,68 @@ class MainActivity : Activity() {
         val language = card(parent)
         addLabel(language, getString(R.string.app_language))
         addText(language, getString(R.string.language_choice_hint), 16f, R.color.muted_ink)
-        addLanguageChoice(language, HINDI_LANGUAGE, getString(R.string.hindi))
-        addLanguageChoice(language, ENGLISH_LANGUAGE, getString(R.string.english))
+        addLanguageChoice(language, AppPreferences.HINDI_LANGUAGE, getString(R.string.hindi))
+        addLanguageChoice(language, AppPreferences.ENGLISH_LANGUAGE, getString(R.string.english))
 
         val notification = card(parent)
         addLabel(notification, getString(R.string.notification_access))
-        addText(notification, getString(R.string.not_checked), 21f, R.color.ink, medium = true)
+        val accessEnabled = NotificationAccess.isEnabled(this)
+        addText(
+            notification,
+            getString(if (accessEnabled) R.string.listener_ready else R.string.listener_not_ready),
+            21f,
+            R.color.ink,
+            medium = true
+        )
         addText(
             notification,
             getString(R.string.notification_access_explanation),
             16f,
             R.color.muted_ink
         )
-        addAction(notification, getString(R.string.available_next_milestone), primary = false, enabled = false) {}
+        addText(notification, getString(R.string.notification_access_scope), 15f, R.color.muted_ink)
+        addAction(notification, getString(R.string.enable_notification_access), primary = true) {
+            startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+        }
 
         val speech = card(parent)
         addLabel(speech, getString(R.string.hindi_voice))
-        addText(speech, getString(R.string.voice_not_checked), 21f, R.color.ink, medium = true)
+        addText(
+            speech,
+            getString(
+                when {
+                    hindiVoiceReady -> R.string.offline_voice_ready
+                    !ttsCheckComplete -> R.string.voice_checking
+                    else -> R.string.offline_voice_missing
+                }
+            ),
+            21f,
+            R.color.ink,
+            medium = true
+        )
         addText(
             speech,
             getString(R.string.voice_explanation),
             16f,
             R.color.muted_ink
         )
-        addAction(speech, getString(R.string.check_voice), primary = true, enabled = false) {}
+        addAction(speech, getString(R.string.test_speech), primary = true, enabled = hindiVoiceReady) {
+            speechController?.speakHindi(getString(R.string.test_speech_phrase))
+        }
+        if (ttsCheckComplete && !hindiVoiceReady) {
+            addAction(speech, getString(R.string.open_voice_settings), primary = false) {
+                openHindiVoiceSettings()
+            }
+        }
+
+        val announcements = card(parent)
+        addLabel(announcements, getString(R.string.announcement_setting))
+        addAnnouncementsSwitch(announcements)
 
         val privacy = card(parent)
         addLabel(privacy, getString(R.string.your_information))
-        addText(privacy, getString(R.string.no_read_or_store_yet), 17f, R.color.ink)
-        addText(privacy, getString(R.string.permission_purpose_next_step), 15f, R.color.muted_ink)
+        addText(privacy, getString(R.string.allowlist_privacy), 17f, R.color.ink)
+        addText(privacy, getString(R.string.local_only_no_notification_text), 15f, R.color.muted_ink)
     }
 
     private fun addLanguageChoice(parent: LinearLayout, language: String, label: String) {
@@ -178,6 +262,31 @@ class MainActivity : Activity() {
             setOnClickListener { setUiLanguage(language) }
         }
         parent.addView(button, margin(top = 4, bottom = 4))
+    }
+
+    private fun addAnnouncementsSwitch(parent: LinearLayout) {
+        val announcementsSwitch = Switch(this).apply {
+            text = getString(R.string.announcements_switch_label)
+            textSize = 17f
+            minHeight = dp(52)
+            isChecked = AppPreferences.announcementsEnabled(this@MainActivity)
+            setOnCheckedChangeListener { _, enabled ->
+                AppPreferences.setAnnouncementsEnabled(this@MainActivity, enabled)
+                if (!enabled) {
+                    sendBroadcast(
+                        Intent(SpeechActions.STOP_QUEUED_ANNOUNCEMENTS).setPackage(packageName)
+                    )
+                }
+                showScreen(currentScreen)
+            }
+        }
+        parent.addView(announcementsSwitch, margin(top = 4))
+        addText(
+            parent,
+            getString(if (AppPreferences.announcementsEnabled(this)) R.string.announcements_enabled else R.string.announcements_disabled),
+            15f,
+            R.color.muted_ink
+        )
     }
 
     private fun addHistory(parent: LinearLayout) {
@@ -303,24 +412,47 @@ class MainActivity : Activity() {
     }
 
     private fun toggleLanguage() {
-        val nextLanguage = if (getUiLanguage() == HINDI_LANGUAGE) {
-            ENGLISH_LANGUAGE
+        val nextLanguage = if (getUiLanguage() == AppPreferences.HINDI_LANGUAGE) {
+            AppPreferences.ENGLISH_LANGUAGE
         } else {
-            HINDI_LANGUAGE
+            AppPreferences.HINDI_LANGUAGE
         }
         setUiLanguage(nextLanguage)
     }
 
-    private fun getUiLanguage(): String = getSharedPreferences(PREFERENCES, MODE_PRIVATE)
-        .getString(UI_LANGUAGE, HINDI_LANGUAGE) ?: HINDI_LANGUAGE
+    private fun getUiLanguage(): String = AppPreferences.uiLanguage(this)
 
     private fun setUiLanguage(language: String) {
         if (getUiLanguage() == language) return
-        getSharedPreferences(PREFERENCES, MODE_PRIVATE)
-            .edit()
-            .putString(UI_LANGUAGE, language)
-            .apply()
+        AppPreferences.setUiLanguage(this, language)
         recreate()
+    }
+
+    private fun openHindiVoiceSettings() {
+        voiceSettingsOpened = true
+        try {
+            startActivity(Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA))
+        } catch (_: ActivityNotFoundException) {
+            voiceSettingsOpened = false
+            Toast.makeText(this, R.string.voice_settings_unavailable, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun initializeSpeechController(refreshListenerService: Boolean = false) {
+        speechControllerGeneration++
+        val generation = speechControllerGeneration
+        ttsCheckComplete = false
+        hindiVoiceReady = false
+        speechController?.shutdown()
+        speechController = HindiSpeechController(this) { ready ->
+            if (generation != speechControllerGeneration) return@HindiSpeechController
+            hindiVoiceReady = ready
+            ttsCheckComplete = true
+            if (ready && refreshListenerService) {
+                sendBroadcast(Intent(SpeechActions.REFRESH_LOCAL_HINDI_VOICE).setPackage(packageName))
+            }
+            if (!isFinishing) showScreen(currentScreen)
+        }
     }
 
     private fun rounded(color: Int, radius: Int, strokeColor: Int? = null): GradientDrawable =
