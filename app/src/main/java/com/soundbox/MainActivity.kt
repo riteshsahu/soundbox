@@ -1,27 +1,49 @@
 package com.soundbox
 
 import android.app.Activity
+import android.app.AlertDialog
+import android.app.DatePickerDialog
 import android.content.ActivityNotFoundException
+import android.content.BroadcastReceiver
 import android.content.Intent
 import android.content.Context
 import android.content.res.Configuration
+import android.database.sqlite.SQLiteException
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.speech.tts.TextToSpeech
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
+import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.RadioButton
+import android.widget.RadioGroup
 import android.widget.ScrollView
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
-import java.util.Locale
+import android.text.InputType
+import android.text.TextWatcher
+import com.soundbox.history.PaymentHistoryFilter
+import com.soundbox.history.PaymentHistoryRepository
+import com.soundbox.history.PaymentHistoryRules
+import com.soundbox.history.PaymentRecord
 import com.soundbox.notifications.NotificationAccess
+import com.soundbox.notifications.PaymentProvider
 import com.soundbox.speech.HindiSpeechController
+import com.soundbox.speech.HistoryActions
 import com.soundbox.speech.SpeechActions
+import java.util.Locale
+import java.util.Calendar
+import java.util.Date
+import java.text.DateFormat
+import java.text.NumberFormat
+import java.math.BigDecimal
+import java.math.RoundingMode
 
 class MainActivity : Activity() {
     private enum class Screen { HOME, SETUP, HISTORY }
@@ -32,6 +54,23 @@ class MainActivity : Activity() {
     private var voiceSettingsOpened = false
     private var speechControllerGeneration = 0
     private var speechController: HindiSpeechController? = null
+    private var historyRepository: PaymentHistoryRepository? = null
+    private var historyStartMillis = 0L
+    private var historyEndDateMillis = 0L
+    private var historySourceApp: String? = null
+    private var minimumAmountText = ""
+    private var maximumAmountText = ""
+    private var minimumAmountPaise: Long? = null
+    private var maximumAmountPaise: Long? = null
+    private var historyFilterError: String? = null
+    private var historyStorageError = false
+    private var paymentEventsReceiverRegistered = false
+
+    private val paymentEventsReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (::page.isInitialized) showScreen(currentScreen)
+        }
+    }
 
     override fun attachBaseContext(newBase: Context) {
         val language = AppPreferences.uiLanguage(newBase)
@@ -44,8 +83,22 @@ class MainActivity : Activity() {
     private lateinit var page: LinearLayout
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        historyRepository = PaymentHistoryRepository(this)
+        resetHistoryFilters()
         initializeSpeechController()
         showScreen(Screen.HOME)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        val filter = android.content.IntentFilter(HistoryActions.PAYMENTS_CHANGED)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(paymentEventsReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("DEPRECATION")
+            registerReceiver(paymentEventsReceiver, filter)
+        }
+        paymentEventsReceiverRegistered = true
     }
 
     override fun onResume() {
@@ -61,11 +114,22 @@ class MainActivity : Activity() {
         speechControllerGeneration++
         speechController?.shutdown()
         speechController = null
+        historyRepository?.close()
+        historyRepository = null
         super.onDestroy()
+    }
+
+    override fun onStop() {
+        if (paymentEventsReceiverRegistered) {
+            unregisterReceiver(paymentEventsReceiver)
+            paymentEventsReceiverRegistered = false
+        }
+        super.onStop()
     }
 
     private fun showScreen(screen: Screen) {
         currentScreen = screen
+        historyStorageError = false
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(getColor(R.color.canvas))
@@ -137,8 +201,7 @@ class MainActivity : Activity() {
 
         val status = card(parent)
         addLabel(status, getString(R.string.listening_status))
-        val listeningReady = NotificationAccess.isEnabled(this) &&
-            AppPreferences.announcementsEnabled(this) && hindiVoiceReady
+        val listeningReady = NotificationAccess.isEnabled(this)
         addText(
             status,
             getString(if (listeningReady) R.string.listening_active else R.string.listening_needs_setup),
@@ -168,14 +231,26 @@ class MainActivity : Activity() {
 
         val total = card(parent)
         addLabel(total, getString(R.string.today_total))
-        addText(total, getString(R.string.not_available_yet), 25f, R.color.forest_dark, medium = true)
+        val todayTotalPaise = readHistory(0L) { historyRepository?.todayTotal() ?: 0L }
+        if (historyStorageError) {
+            addText(total, getString(R.string.history_storage_error), 17f, R.color.amber)
+        } else {
+            addText(total, formatAmount(todayTotalPaise), 34f, R.color.forest_dark, medium = true)
+        }
         addText(total, getString(R.string.local_date_note), 15f, R.color.muted_ink)
-        addText(total, getString(R.string.recording_unavailable), 15f, R.color.muted_ink)
 
         val latest = card(parent)
         addLabel(latest, getString(R.string.latest_payment))
-        addText(latest, getString(R.string.no_payment_recorded), 19f, R.color.ink, medium = true)
-        addText(latest, getString(R.string.history_next_step), 15f, R.color.muted_ink)
+        val latestPayment = readHistory(null as PaymentRecord?) { historyRepository?.latestPayment() }
+        if (historyStorageError) {
+            addText(latest, getString(R.string.history_storage_error), 17f, R.color.amber)
+        } else if (latestPayment == null) {
+            addText(latest, getString(R.string.no_payment_recorded), 19f, R.color.ink, medium = true)
+        } else {
+            addText(latest, formatAmount(latestPayment.amountPaise), 24f, R.color.ink, medium = true)
+            addText(latest, getString(R.string.last_payment_source, latestPayment.sourceApp), 16f, R.color.muted_ink)
+            addText(latest, formatDateTime(latestPayment.receivedAtMillis), 15f, R.color.muted_ink)
+        }
         addAction(latest, getString(R.string.view_history), primary = false) { showScreen(Screen.HISTORY) }
     }
 
@@ -283,7 +358,7 @@ class MainActivity : Activity() {
         parent.addView(announcementsSwitch, margin(top = 4))
         addText(
             parent,
-            getString(if (AppPreferences.announcementsEnabled(this)) R.string.announcements_enabled else R.string.announcements_disabled),
+            getString(R.string.announcement_off_history_on),
             15f,
             R.color.muted_ink
         )
@@ -292,22 +367,232 @@ class MainActivity : Activity() {
     private fun addHistory(parent: LinearLayout) {
         addTitle(parent, getString(R.string.history_title), getString(R.string.history_subtitle))
 
-        val summary = card(parent)
-        addLabel(summary, getString(R.string.retention_period))
-        addText(summary, getString(R.string.three_months), 21f, R.color.ink, medium = true)
-        addText(summary, getString(R.string.total_ignores_filters), 15f, R.color.muted_ink)
-
         val filters = card(parent)
+        addLabel(filters, getString(R.string.retention_period))
+        addText(filters, getString(R.string.three_months), 18f, R.color.ink, medium = true)
         addLabel(filters, getString(R.string.filters))
-        addText(filters, getString(R.string.filter_fields), 17f, R.color.ink, medium = true)
-        addText(filters, getString(R.string.filters_next_step), 15f, R.color.muted_ink)
-        addAction(filters, getString(R.string.reset_filters), primary = false, enabled = false) {}
+        addLabel(filters, getString(R.string.date_range_filter))
+        addAction(
+            filters,
+            getString(R.string.date_from, formatDate(historyStartMillis)),
+            primary = false
+        ) { showDatePicker(selectStartDate = true) }
+        addAction(
+            filters,
+            getString(R.string.date_to, formatDate(historyEndDateMillis)),
+            primary = false
+        ) { showDatePicker(selectStartDate = false) }
 
-        val empty = card(parent)
-        addLabel(empty, getString(R.string.empty_history_title))
-        addText(empty, getString(R.string.empty_history_body), 18f, R.color.ink, medium = true)
-        addText(empty, getString(R.string.notification_not_bank_confirmation), 15f, R.color.muted_ink)
-        addAction(empty, getString(R.string.clear_history), primary = false, enabled = false) {}
+        addLabel(filters, getString(R.string.source_filter))
+        val sourceGroup = RadioGroup(this).apply {
+            orientation = RadioGroup.VERTICAL
+            addSourceOption(this, null, getString(R.string.all_sources))
+            PaymentProvider.entries.forEach { provider ->
+                addSourceOption(this, provider.displayName, provider.displayName)
+            }
+        }
+        sourceGroup.setOnCheckedChangeListener { group, checkedId ->
+            val selected = group.findViewById<RadioButton>(checkedId)
+            historySourceApp = selected?.tag as? String
+            historyFilterError = null
+            showScreen(Screen.HISTORY)
+        }
+        filters.addView(sourceGroup, margin(bottom = 8))
+
+        addLabel(filters, getString(R.string.amount_filter))
+        val amountRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+        val minimumField = amountInput(
+            getString(R.string.minimum_amount_hint),
+            minimumAmountText
+        ) { minimumAmountText = it }
+        val maximumField = amountInput(
+            getString(R.string.maximum_amount_hint),
+            maximumAmountText
+        ) { maximumAmountText = it }
+        amountRow.addView(minimumField, LinearLayout.LayoutParams(0, dp(56), 1f).apply {
+            marginEnd = dp(6)
+        })
+        amountRow.addView(maximumField, LinearLayout.LayoutParams(0, dp(56), 1f).apply {
+            marginStart = dp(6)
+        })
+        filters.addView(amountRow, margin(bottom = 8))
+
+        historyFilterError?.let { addText(filters, it, 15f, R.color.amber) }
+        addAction(filters, getString(R.string.apply_filters), primary = true) {
+            applyHistoryFilters()
+        }
+        addAction(filters, getString(R.string.reset_filters), primary = false) {
+            resetHistoryFilters()
+            showScreen(Screen.HISTORY)
+        }
+        addText(filters, getString(R.string.total_ignores_filters), 15f, R.color.muted_ink, top = 6)
+
+        val records = readHistory(emptyList()) { historyRepository?.history(currentHistoryFilter()).orEmpty() }
+        if (historyStorageError) {
+            val error = card(parent)
+            addText(error, getString(R.string.history_storage_error), 17f, R.color.amber)
+        } else if (records.isEmpty()) {
+            val empty = card(parent)
+            addLabel(empty, getString(R.string.empty_history_title))
+            addText(empty, getString(R.string.no_matching_payments), 18f, R.color.ink, medium = true)
+            addText(empty, getString(R.string.notification_not_bank_confirmation), 15f, R.color.muted_ink)
+        } else {
+            records.forEach { addPaymentRecord(parent, it) }
+        }
+
+        val clear = card(parent)
+        addAction(clear, getString(R.string.clear_history), primary = false) {
+            confirmClearHistory()
+        }
+    }
+
+    private fun addSourceOption(group: RadioGroup, sourceApp: String?, label: String) {
+        val option = RadioButton(this).apply {
+            id = View.generateViewId()
+            text = label
+            textSize = 17f
+            minHeight = dp(48)
+            tag = sourceApp
+            isChecked = historySourceApp == sourceApp
+        }
+        group.addView(option)
+    }
+
+    private fun amountInput(hint: String, value: String, onChanged: (String) -> Unit): EditText =
+        EditText(this).apply {
+            this.hint = hint
+            setText(value)
+            textSize = 16f
+            minHeight = dp(56)
+            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
+            setSingleLine(true)
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+            addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                    onChanged(s?.toString().orEmpty())
+                }
+                override fun afterTextChanged(s: android.text.Editable?) = Unit
+            })
+        }
+
+    private fun addPaymentRecord(parent: LinearLayout, record: PaymentRecord) {
+        val item = card(parent)
+        addText(item, formatAmount(record.amountPaise), 24f, R.color.ink, medium = true)
+        addText(item, getString(R.string.last_payment_source, record.sourceApp), 16f, R.color.forest)
+        addText(item, getString(R.string.received_at, formatDateTime(record.receivedAtMillis)), 15f, R.color.muted_ink)
+    }
+
+    private fun currentHistoryFilter(): PaymentHistoryFilter = PaymentHistoryFilter(
+        startInclusiveMillis = historyStartMillis,
+        endExclusiveMillis = PaymentHistoryRules.localDayBounds(historyEndDateMillis).endExclusiveMillis,
+        sourceApp = historySourceApp,
+        minimumAmountPaise = minimumAmountPaise,
+        maximumAmountPaise = maximumAmountPaise
+    )
+
+    private fun applyHistoryFilters() {
+        val minimum = parseAmountFilter(minimumAmountText)
+        val maximum = parseAmountFilter(maximumAmountText)
+        val invalidMinimum = minimumAmountText.isNotBlank() && minimum == null
+        val invalidMaximum = maximumAmountText.isNotBlank() && maximum == null
+        if (invalidMinimum || invalidMaximum || (minimum != null && maximum != null && minimum > maximum)) {
+            historyFilterError = getString(R.string.invalid_amount_range)
+            showScreen(Screen.HISTORY)
+            return
+        }
+        minimumAmountPaise = minimum
+        maximumAmountPaise = maximum
+        historyFilterError = null
+        showScreen(Screen.HISTORY)
+    }
+
+    private fun parseAmountFilter(raw: String): Long? {
+        if (raw.isBlank()) return null
+        return try {
+            BigDecimal(raw.trim().replace(",", "").removePrefix("₹"))
+                .setScale(2, RoundingMode.UNNECESSARY)
+                .movePointRight(2)
+                .longValueExact()
+                .takeIf { it >= 0L }
+        } catch (_: ArithmeticException) {
+            null
+        } catch (_: NumberFormatException) {
+            null
+        }
+    }
+
+    private fun resetHistoryFilters() {
+        val now = System.currentTimeMillis()
+        val cutoff = PaymentHistoryRules.retentionCutoff(now)
+        historyStartMillis = PaymentHistoryRules.localDayBounds(cutoff).startInclusiveMillis
+        historyEndDateMillis = PaymentHistoryRules.localDayBounds(now).startInclusiveMillis
+        historySourceApp = null
+        minimumAmountText = ""
+        maximumAmountText = ""
+        minimumAmountPaise = null
+        maximumAmountPaise = null
+        historyFilterError = null
+    }
+
+    private fun showDatePicker(selectStartDate: Boolean) {
+        val selectedMillis = if (selectStartDate) historyStartMillis else historyEndDateMillis
+        val initial = Calendar.getInstance().apply { timeInMillis = selectedMillis }
+        val cutoff = PaymentHistoryRules.retentionCutoff(System.currentTimeMillis())
+        val dialog = DatePickerDialog(
+            this,
+            { _, year, month, day ->
+                val selected = Calendar.getInstance().apply {
+                    set(year, month, day, 0, 0, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }.timeInMillis
+                if (selectStartDate) {
+                    historyStartMillis = selected
+                    if (historyStartMillis > historyEndDateMillis) historyEndDateMillis = selected
+                } else {
+                    historyEndDateMillis = selected
+                    if (historyEndDateMillis < historyStartMillis) historyStartMillis = selected
+                }
+                showScreen(Screen.HISTORY)
+            },
+            initial.get(Calendar.YEAR),
+            initial.get(Calendar.MONTH),
+            initial.get(Calendar.DAY_OF_MONTH)
+        )
+        dialog.datePicker.minDate = cutoff
+        dialog.datePicker.maxDate = System.currentTimeMillis()
+        dialog.show()
+    }
+
+    private fun confirmClearHistory() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.confirm_clear_title)
+            .setMessage(R.string.confirm_clear_message)
+            .setNegativeButton(R.string.cancel_action, null)
+            .setPositiveButton(R.string.confirm_clear_action) { _, _ ->
+                val cleared = try {
+                    historyRepository?.clearHistory()
+                    true
+                } catch (_: SQLiteException) {
+                    false
+                }
+                Toast.makeText(
+                    this,
+                    if (cleared) R.string.history_cleared else R.string.history_storage_error,
+                    Toast.LENGTH_SHORT
+                ).show()
+                showScreen(currentScreen)
+            }
+            .show()
+    }
+
+    private inline fun <T> readHistory(fallback: T, action: () -> T): T = try {
+        action()
+    } catch (_: SQLiteException) {
+        historyStorageError = true
+        fallback
     }
 
     private fun addTitle(parent: LinearLayout, title: String, subtitle: String) {
@@ -427,6 +712,26 @@ class MainActivity : Activity() {
         AppPreferences.setUiLanguage(this, language)
         recreate()
     }
+
+    private fun formatAmount(amountPaise: Long): String {
+        val formatter = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("en-IN")).apply {
+            minimumFractionDigits = if (amountPaise % 100L == 0L) 0 else 2
+            maximumFractionDigits = 2
+        }
+        return formatter.format(BigDecimal.valueOf(amountPaise, 2))
+    }
+
+    private fun formatDate(timestampMillis: Long): String = DateFormat
+        .getDateInstance(DateFormat.MEDIUM, Locale.forLanguageTag(getUiLanguage()))
+        .format(Date(timestampMillis))
+
+    private fun formatDateTime(timestampMillis: Long): String = DateFormat
+        .getDateTimeInstance(
+            DateFormat.MEDIUM,
+            DateFormat.SHORT,
+            Locale.forLanguageTag(getUiLanguage())
+        )
+        .format(Date(timestampMillis))
 
     private fun openHindiVoiceSettings() {
         voiceSettingsOpened = true

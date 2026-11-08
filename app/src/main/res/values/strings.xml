@@ -72,6 +72,26 @@
     <string name="ready_voice_and_access">सूचना ऐक्सेस और हिंदी आवाज़ तैयार</string>
     <string name="notification_access_scope">Android इस अनुमति से अन्य ऐप की सूचनाएँ भी उपलब्ध करा सकता है। SoundBox सामग्री पढ़ने से पहले गैर-अनुमत पैकेज को छोड़ देता है।</string>
     <string name="allowlist_privacy">केवल Google Pay, PhonePe और Paytm के लिए चुने गए पैकेज की जाँच होती है।</string>
-    <string name="local_only_no_notification_text">सूचना का मूल पाठ सहेजा या लॉग नहीं किया जाता। अभी भुगतान इतिहास संग्रहीत नहीं होता।</string>
+    <string name="local_only_no_notification_text">केवल रकम, मिलने का समय और ऐप का नाम फ़ोन पर रखे जाते हैं। मूल सूचना सहेजी या लॉग नहीं होती।</string>
     <string name="voice_settings_unavailable">इस फ़ोन पर हिंदी आवाज़ डेटा सेटिंग नहीं खुल सकी। फ़ोन की टेक्स्ट-टू-स्पीच सेटिंग खोलें।</string>
+    <string name="all_sources">सभी ऐप</string>
+    <string name="date_from">से: %1$s</string>
+    <string name="date_to">तक: %1$s</string>
+    <string name="date_range_filter">तारीख़ की सीमा</string>
+    <string name="source_filter">भुगतान ऐप</string>
+    <string name="amount_filter">रकम की सीमा</string>
+    <string name="minimum_amount_hint">कम से कम ₹</string>
+    <string name="maximum_amount_hint">ज़्यादा से ज़्यादा ₹</string>
+    <string name="apply_filters">फ़िल्टर लागू करें</string>
+    <string name="invalid_amount_range">रकम सही लिखें और जाँचें कि न्यूनतम रकम अधिकतम से बड़ी न हो।</string>
+    <string name="no_matching_payments">इन फ़िल्टर से कोई भुगतान नहीं मिला।</string>
+    <string name="received_at">मिला: %1$s</string>
+    <string name="confirm_clear_title">भुगतान इतिहास मिटाएँ?</string>
+    <string name="confirm_clear_message">फ़ोन पर रखे सभी भुगतान रिकॉर्ड हमेशा के लिए मिट जाएँगे।</string>
+    <string name="confirm_clear_action">इतिहास मिटाएँ</string>
+    <string name="cancel_action">रद्द करें</string>
+    <string name="history_cleared">भुगतान इतिहास मिटा दिया गया।</string>
+    <string name="last_payment_source">ऐप: %1$s</string>
+    <string name="announcement_off_history_on">आवाज़ बंद होने पर भी योग्य भुगतान इतिहास में सहेजे जाएँगे।</string>
+    <string name="history_storage_error">भुगतान इतिहास अभी नहीं खुल सका। बाद में फिर कोशिश करें।</string>
 </resources>

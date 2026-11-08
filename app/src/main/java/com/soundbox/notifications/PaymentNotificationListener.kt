@@ -4,18 +4,22 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.database.sqlite.SQLiteException
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.app.Notification
 import android.os.Build
 import com.soundbox.AppPreferences
+import com.soundbox.history.PaymentHistoryRepository
+import com.soundbox.history.PaymentRecord
 import com.soundbox.speech.HindiPaymentPhrase
 import com.soundbox.speech.HindiSpeechController
+import com.soundbox.speech.HistoryActions
 import com.soundbox.speech.SpeechActions
 
 class PaymentNotificationListener : NotificationListenerService() {
     private lateinit var speechController: HindiSpeechController
-    private val deduplicator = RecentPaymentDeduplicator()
+    private lateinit var historyRepository: PaymentHistoryRepository
     private val refreshVoiceReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
@@ -39,12 +43,12 @@ class PaymentNotificationListener : NotificationListenerService() {
             registerReceiver(refreshVoiceReceiver, filter)
         }
         speechController = HindiSpeechController(applicationContext) { }
+        historyRepository = PaymentHistoryRepository(applicationContext)
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         // Reject every non-allowlisted package before accessing notification content.
         val provider = PaymentProvider.fromPackageName(sbn.packageName) ?: return
-        if (!AppPreferences.announcementsEnabled(this)) return
 
         val notification = sbn.notification ?: return
         val extras = notification.extras ?: return
@@ -54,7 +58,19 @@ class PaymentNotificationListener : NotificationListenerService() {
             ?: extras.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty()
 
         val payment = PaymentNotificationParser.parse(provider.packageName, title, content) ?: return
-        if (!deduplicator.shouldAnnounce(payment, sbn.postTime)) return
+        val record = PaymentRecord(
+            amountPaise = payment.amountPaise,
+            receivedAtMillis = sbn.postTime,
+            sourceApp = payment.source.displayName
+        )
+        val inserted = try {
+            historyRepository.recordIfUnique(record)
+        } catch (_: SQLiteException) {
+            false
+        }
+        if (!inserted) return
+        sendBroadcast(Intent(HistoryActions.PAYMENTS_CHANGED).setPackage(packageName))
+        if (!AppPreferences.announcementsEnabled(this)) return
 
         val phrase = HindiPaymentPhrase.received(payment.amountPaise) ?: return
         speechController.speakHindi(phrase)
@@ -63,6 +79,7 @@ class PaymentNotificationListener : NotificationListenerService() {
     override fun onDestroy() {
         unregisterReceiver(refreshVoiceReceiver)
         if (::speechController.isInitialized) speechController.shutdown()
+        if (::historyRepository.isInitialized) historyRepository.close()
         super.onDestroy()
     }
 }

@@ -72,6 +72,26 @@
     <string name="ready_voice_and_access">Notification access and Hindi voice are ready</string>
     <string name="notification_access_scope">Android may make notifications from other apps visible to this service. SoundBox skips non-allowlisted packages before reading their content.</string>
     <string name="allowlist_privacy">Only notifications from the selected Google Pay, PhonePe, and Paytm package IDs are checked.</string>
-    <string name="local_only_no_notification_text">Notification text is not saved or logged. Payment history is not stored yet.</string>
+    <string name="local_only_no_notification_text">Only amount, received time, and source app are kept on this phone. Original notification text is never saved or logged.</string>
     <string name="voice_settings_unavailable">Hindi voice data settings could not be opened. Open the phone’s text-to-speech settings instead.</string>
+    <string name="all_sources">All apps</string>
+    <string name="date_from">From: %1$s</string>
+    <string name="date_to">To: %1$s</string>
+    <string name="date_range_filter">Date range</string>
+    <string name="source_filter">Payment app</string>
+    <string name="amount_filter">Amount range</string>
+    <string name="minimum_amount_hint">Minimum ₹</string>
+    <string name="maximum_amount_hint">Maximum ₹</string>
+    <string name="apply_filters">Apply filters</string>
+    <string name="invalid_amount_range">Enter valid amounts and make sure the minimum is not greater than the maximum.</string>
+    <string name="no_matching_payments">No payments match these filters.</string>
+    <string name="received_at">Received: %1$s</string>
+    <string name="confirm_clear_title">Clear payment history?</string>
+    <string name="confirm_clear_message">All payment records saved on this phone will be permanently deleted.</string>
+    <string name="confirm_clear_action">Clear history</string>
+    <string name="cancel_action">Cancel</string>
+    <string name="history_cleared">Payment history cleared.</string>
+    <string name="last_payment_source">App: %1$s</string>
+    <string name="announcement_off_history_on">Eligible payments are still saved to history when announcements are off.</string>
+    <string name="history_storage_error">Payment history could not be opened. Please try again later.</string>
 </resources>
