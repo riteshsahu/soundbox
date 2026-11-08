@@ -10,7 +10,7 @@ SoundBox is a small, native Android app for announcing confidently identified in
 
 **Milestone 3 — History and totals:** Accepted credits are stored in a private SQLite database using only amount in paise, received timestamp, and source app. It prunes entries older than three calendar months, suppresses likely duplicates across restarts using only source, amount, and nearby timestamp, computes today’s total using the device’s local date, and offers date, source, and amount filters plus a confirmed clear action. Today’s headline total is independent of history filters.
 
-Audio enhancement is not implemented yet. The app labels incomplete features so they are not mistaken for working behavior.
+**Milestone 4 — Speech loudness:** Setup offers Normal (the default) and an optional boosted setting. The app attempts a `LoudnessEnhancer` effect on SoundBox’s own Hindi TTS audio session, capped at +6 dB. If Android or the device cannot provide the effect, speech continues at normal level. This does not change system volume, and the audible result depends on the device’s hardware. The effect has not yet been validated on the Redmi Note 8 Pro.
 
 Notification access is a user-enabled Android system setting; the app does not declare a `uses-permission` for it and does not request `POST_NOTIFICATIONS`. Android backup is disabled in the manifest. The database contains only amount in paise, received timestamp, and source app. The listener checks the exact package allowlist before accessing notification content, and it does not log notification text. No network permission or cloud service is included.
 

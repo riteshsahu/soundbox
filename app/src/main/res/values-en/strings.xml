@@ -94,4 +94,13 @@
     <string name="last_payment_source">App: %1$s</string>
     <string name="announcement_off_history_on">Eligible payments are still saved to history when announcements are off.</string>
     <string name="history_storage_error">Payment history could not be opened. Please try again later.</string>
+    <string name="loudness_boost">Speech volume</string>
+    <string name="normal_sound">Normal sound (default)</string>
+    <string name="boosted_sound">Boosted sound (up to +6 dB)</string>
+    <string name="boost_effect_normal">Normal sound is selected.</string>
+    <string name="boost_effect_available">Speech boost is available on this device.</string>
+    <string name="boost_effect_unavailable">This device does not provide speech boost; normal sound will continue.</string>
+    <string name="boost_effect_not_checked">Availability will be checked when Hindi speech is ready.</string>
+    <string name="boost_device_note">This affects only SoundBox’s Hindi speech. Actual loudness depends on the phone and speaker.</string>
+    <string name="test_selected_sound">Test the selected sound</string>
 </resources>

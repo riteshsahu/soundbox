@@ -24,9 +24,21 @@ class PaymentNotificationListener : NotificationListenerService() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
                 SpeechActions.STOP_QUEUED_ANNOUNCEMENTS -> speechController.stopAll()
+                SpeechActions.SET_LOUDNESS_BOOST -> {
+                    speechController.setBoostEnabled(
+                        intent.getBooleanExtra(
+                            SpeechActions.EXTRA_BOOST_ENABLED,
+                            AppPreferences.loudnessBoostEnabled(applicationContext)
+                        )
+                    )
+                }
                 SpeechActions.REFRESH_LOCAL_HINDI_VOICE -> {
                     speechController.shutdown()
-                    speechController = HindiSpeechController(applicationContext) { }
+                    speechController = HindiSpeechController(
+                        context = applicationContext,
+                        onReadinessChanged = {},
+                        initialBoostEnabled = AppPreferences.loudnessBoostEnabled(applicationContext)
+                    )
                 }
             }
         }
@@ -35,14 +47,21 @@ class PaymentNotificationListener : NotificationListenerService() {
     override fun onCreate() {
         super.onCreate()
         val filter = IntentFilter(SpeechActions.REFRESH_LOCAL_HINDI_VOICE)
-            .apply { addAction(SpeechActions.STOP_QUEUED_ANNOUNCEMENTS) }
+            .apply {
+                addAction(SpeechActions.STOP_QUEUED_ANNOUNCEMENTS)
+                addAction(SpeechActions.SET_LOUDNESS_BOOST)
+            }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(refreshVoiceReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
         } else {
             @Suppress("DEPRECATION")
             registerReceiver(refreshVoiceReceiver, filter)
         }
-        speechController = HindiSpeechController(applicationContext) { }
+        speechController = HindiSpeechController(
+            context = applicationContext,
+            onReadinessChanged = {},
+            initialBoostEnabled = AppPreferences.loudnessBoostEnabled(applicationContext)
+        )
         historyRepository = PaymentHistoryRepository(applicationContext)
     }
 

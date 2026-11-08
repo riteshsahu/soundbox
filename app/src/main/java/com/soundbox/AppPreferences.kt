@@ -8,6 +8,7 @@ object AppPreferences {
     const val HINDI_LANGUAGE = "hi"
     const val ENGLISH_LANGUAGE = "en"
     const val ANNOUNCEMENTS_ENABLED = "announcements_enabled"
+    const val LOUDNESS_BOOST_ENABLED = "loudness_boost_enabled"
 
     fun uiLanguage(context: Context): String = context
         .getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
@@ -28,6 +29,17 @@ object AppPreferences {
         context.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(ANNOUNCEMENTS_ENABLED, enabled)
+            .apply()
+    }
+
+    fun loudnessBoostEnabled(context: Context): Boolean = context
+        .getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
+        .getBoolean(LOUDNESS_BOOST_ENABLED, false)
+
+    fun setLoudnessBoostEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(LOUDNESS_BOOST_ENABLED, enabled)
             .apply()
     }
 }

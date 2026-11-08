@@ -94,4 +94,13 @@
     <string name="last_payment_source">ऐप: %1$s</string>
     <string name="announcement_off_history_on">आवाज़ बंद होने पर भी योग्य भुगतान इतिहास में सहेजे जाएँगे।</string>
     <string name="history_storage_error">भुगतान इतिहास अभी नहीं खुल सका। बाद में फिर कोशिश करें।</string>
+    <string name="loudness_boost">आवाज़ का स्तर</string>
+    <string name="normal_sound">सामान्य आवाज़ (डिफ़ॉल्ट)</string>
+    <string name="boosted_sound">बढ़ी हुई आवाज़ (अधिकतम +6 dB)</string>
+    <string name="boost_effect_normal">सामान्य आवाज़ चुनी गई है।</string>
+    <string name="boost_effect_available">इस डिवाइस पर आवाज़ बढ़ाना उपलब्ध है।</string>
+    <string name="boost_effect_unavailable">यह डिवाइस आवाज़ बढ़ाने की सुविधा नहीं दे रहा; सामान्य आवाज़ जारी रहेगी।</string>
+    <string name="boost_effect_not_checked">हिंदी आवाज़ तैयार होने पर सुविधा की जाँच होगी।</string>
+    <string name="boost_device_note">यह विकल्प केवल SoundBox की हिंदी आवाज़ को प्रभावित करता है। वास्तविक आवाज़ फ़ोन और स्पीकर पर निर्भर करती है।</string>
+    <string name="test_selected_sound">चुनी हुई आवाज़ जाँचें</string>
 </resources>

@@ -51,6 +51,7 @@ class MainActivity : Activity() {
     private var currentScreen = Screen.HOME
     private var hindiVoiceReady = false
     private var ttsCheckComplete = false
+    private var boostAvailable: Boolean? = null
     private var voiceSettingsOpened = false
     private var speechControllerGeneration = 0
     private var speechController: HindiSpeechController? = null
@@ -318,6 +319,31 @@ class MainActivity : Activity() {
         addLabel(announcements, getString(R.string.announcement_setting))
         addAnnouncementsSwitch(announcements)
 
+        val loudness = card(parent)
+        addLabel(loudness, getString(R.string.loudness_boost))
+        addText(loudness, getString(R.string.boost_device_note), 15f, R.color.muted_ink)
+        val boostState = AppPreferences.loudnessBoostEnabled(this)
+        addText(
+            loudness,
+            getString(
+                when {
+                    !boostState -> R.string.boost_effect_normal
+                    boostAvailable == true -> R.string.boost_effect_available
+                    boostAvailable == false -> R.string.boost_effect_unavailable
+                    else -> R.string.boost_effect_not_checked
+                }
+            ),
+            16f,
+            R.color.muted_ink
+        )
+        val loudnessChoices = RadioGroup(this).apply { orientation = RadioGroup.VERTICAL }
+        addLoudnessChoice(loudnessChoices, enabled = false, label = getString(R.string.normal_sound))
+        addLoudnessChoice(loudnessChoices, enabled = true, label = getString(R.string.boosted_sound))
+        loudness.addView(loudnessChoices, margin(top = 4))
+        addAction(loudness, getString(R.string.test_selected_sound), primary = false, enabled = hindiVoiceReady) {
+            speechController?.speakHindi(getString(R.string.test_speech_phrase))
+        }
+
         val privacy = card(parent)
         addLabel(privacy, getString(R.string.your_information))
         addText(privacy, getString(R.string.allowlist_privacy), 17f, R.color.ink)
@@ -362,6 +388,29 @@ class MainActivity : Activity() {
             15f,
             R.color.muted_ink
         )
+    }
+
+    private fun addLoudnessChoice(parent: RadioGroup, enabled: Boolean, label: String) {
+        val choice = RadioButton(this).apply {
+            text = label
+            textSize = 17f
+            minHeight = dp(52)
+            isChecked = AppPreferences.loudnessBoostEnabled(this@MainActivity) == enabled
+            setOnClickListener {
+                AppPreferences.setLoudnessBoostEnabled(this@MainActivity, enabled)
+                boostAvailable = speechController?.setBoostEnabled(enabled)
+                sendBroadcast(
+                    Intent(SpeechActions.SET_LOUDNESS_BOOST)
+                        .setPackage(packageName)
+                        .putExtra(SpeechActions.EXTRA_BOOST_ENABLED, enabled)
+                )
+                showScreen(currentScreen)
+            }
+        }
+        parent.addView(choice, LinearLayout.LayoutParams(-1, -2).apply {
+            topMargin = dp(2)
+            bottomMargin = dp(2)
+        })
     }
 
     private fun addHistory(parent: LinearLayout) {
@@ -748,16 +797,26 @@ class MainActivity : Activity() {
         val generation = speechControllerGeneration
         ttsCheckComplete = false
         hindiVoiceReady = false
+        boostAvailable = null
         speechController?.shutdown()
-        speechController = HindiSpeechController(this) { ready ->
-            if (generation != speechControllerGeneration) return@HindiSpeechController
-            hindiVoiceReady = ready
-            ttsCheckComplete = true
-            if (ready && refreshListenerService) {
-                sendBroadcast(Intent(SpeechActions.REFRESH_LOCAL_HINDI_VOICE).setPackage(packageName))
-            }
-            if (!isFinishing) showScreen(currentScreen)
-        }
+        speechController = HindiSpeechController(
+            context = this,
+            onReadinessChanged = { ready ->
+                if (generation != speechControllerGeneration) return@HindiSpeechController
+                hindiVoiceReady = ready
+                ttsCheckComplete = true
+                if (ready && refreshListenerService) {
+                    sendBroadcast(Intent(SpeechActions.REFRESH_LOCAL_HINDI_VOICE).setPackage(packageName))
+                }
+                if (!isFinishing) showScreen(currentScreen)
+            },
+            onBoostAvailabilityChanged = { available ->
+                if (generation != speechControllerGeneration) return@HindiSpeechController
+                boostAvailable = available
+                if (!isFinishing) showScreen(currentScreen)
+            },
+            initialBoostEnabled = AppPreferences.loudnessBoostEnabled(this)
+        )
     }
 
     private fun rounded(color: Int, radius: Int, strokeColor: Int? = null): GradientDrawable =
