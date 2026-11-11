@@ -73,10 +73,25 @@ class PaymentNotificationParserTest {
     }
 
     @Test
+    fun acceptsWordingVariantsAcrossTitleAndBody() {
+        val parsed = PaymentNotificationParser.parse(
+            PaymentProvider.GOOGLE_PAY.packageName,
+            "₹500 प्राप्त हुआ",
+            "भुगतान सफलतापूर्वक मिला"
+        )
+        assertEquals(50_000L, parsed?.amountPaise)
+
+        assertParsedAmount("₹500 जमा हुआ")
+        assertParsedAmount("₹500 received")
+    }
+
+    @Test
     fun rejectsOutgoingPaymentAndBareReferenceNumbers() {
         assertRejected("₹500 paid to merchant")
         assertRejected("₹500 sent to another account")
         assertRejected("Ref 500 received")
+        assertRejected("₹500 प्राप्त नहीं हुआ")
+        assertRejected("₹500 received; request pending")
     }
 
     @Test

@@ -23,13 +23,15 @@ object PaymentNotificationParser {
     )
 
     private val incomingPattern = Regex(
-        "(?iu)(?:\\breceived\\b|\\bcredited\\b|\\bdeposited\\b|" +
+        "(?iu)(?:\\breceiv(?:ed|es)\\b|\\bcredited\\b|\\bdeposited\\b|" +
             "\\bdeposit(?:ed)? from\\b|\\badded to (?:your )?account\\b|" +
             "\\bmoney received\\b|\\bpayment received\\b|" +
             "\\bpaid (?:to )?you\\b|\\bsent (?:to )?you\\b|" +
             "\\btransferred from\\b|\\btransfer from\\b|" +
-            "प्राप्त हुए|प्राप्त हुई|" +
-            "प्राप्त हो गए|प्राप्त हो गई|मिले|मिली|जमा हो गया|जमा हो गई|खाते में जमा)"
+            "प्राप्त(?:\\s+हो)?\\s+(?:हुआ|हुई|हुए|गया|गई|गए|गयी|गये)|" +
+            "मिला|मिली|मिले|मिल गए|मिल गई|मिल गया|" +
+            "जमा(?:\\s+हो)?\\s+(?:गया|गई|गए|गयी|गये|हुआ|हुई|हुए)|" +
+            "खाते में जमा)"
     )
 
     private val disqualifyingPattern = Regex(
@@ -39,6 +41,7 @@ object PaymentNotificationParser {
             "\\bfailed\\b|\\bfailure\\b|\\bdeclined\\b|\\brejected\\b|" +
             "\\bunsettled\\b|\\bunconfirmed\\b|\\bunsuccessful\\b|" +
             "\\bnot settled\\b|\\bnot completed\\b|\\bnot credited\\b|" +
+            "\\bnot received\\b|\\brequest(?:ed)?\\b|\\bscheduled\\b|" +
             "\\breversed?\\b|\\breversal\\b|" +
             "\\brefund(?:ed)?\\b|\\breturned\\b|\\bcancelled\\b|\\bcanceled\\b|" +
             "\\bcashback\\b|\\bcash back\\b|\\breward\\b|\\bbonus\\b|" +
@@ -46,9 +49,9 @@ object PaymentNotificationParser {
             "\\bprocessing\\b|\\binitiated\\b|\\brequested\\b|" +
             "\\bwill be received\\b|\\bto be received\\b|\\bwill receive\\b|" +
             "\\bwill be credited\\b|\\bto be credited\\b|\\bwill be deposited\\b|" +
-            "not received|असफल|विफल|लंबित|रद्द|वापस|रिवर्स|भेजा|भेजे|" +
+            "प्राप्त नहीं|मिला नहीं|मिली नहीं|मिले नहीं|असफल|विफल|लंबित|रद्द|वापस|रिवर्स|भेजा|भेजे|" +
             "प्राप्त करें|प्राप्त करने|जमा करें|जमा करने|मिलेगा|मिलेगी|मिलेंगे|" +
-            "प्राप्त नहीं|जमा नहीं|सफल नहीं|पूरा नहीं|अस्वीकृत|कैशबैक|इनाम|" +
+            "जमा नहीं|सफल नहीं|पूरा नहीं|अस्वीकृत|कैशबैक|इनाम|" +
             "बोनस|रिचार्ज|रीचार्ज|कूपन|उपहार|" +
             "डेबिट|कटा|निकाला|भुगतान किया)"
     )
