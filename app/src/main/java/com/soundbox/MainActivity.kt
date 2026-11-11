@@ -990,12 +990,14 @@ class MainActivity : Activity() {
                     dayHeading.addView(makeTextView(formatAmount(dayRecords.sumOf { it.amountPaise }), 14f, R.color.ink, medium = true))
                     dayGroup.addView(dayHeading, margin(bottom = 8))
                     dayRecords.forEachIndexed { index, record ->
-                        addPaymentRecord(dayGroup, record, compact = true)
+                        addPaymentRecord(dayGroup, record, compact = true, listRow = true)
                         if (index < dayRecords.lastIndex) {
                             View(this).apply { setBackgroundColor(getColor(R.color.segment_surface)) }
                                 .also { dayGroup.addView(it, LinearLayout.LayoutParams(-1, dp(1)).apply {
                                     marginStart = dp(10)
                                     marginEnd = dp(10)
+                                    topMargin = dp(4)
+                                    bottomMargin = dp(4)
                                 }) }
                         }
                     }
