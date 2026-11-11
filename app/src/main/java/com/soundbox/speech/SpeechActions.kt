@@ -6,4 +6,6 @@ object SpeechActions {
     const val SET_LOUDNESS_BOOST = "com.soundbox.action.SET_LOUDNESS_BOOST"
     const val EXTRA_BOOST_ENABLED = "boost_enabled"
     const val EXTRA_BOOST_DB = "boost_db"
+    const val SET_SPEECH_RATE = "com.soundbox.action.SET_SPEECH_RATE"
+    const val EXTRA_SPEECH_RATE_PERCENT = "speech_rate_percent"
 }

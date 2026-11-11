@@ -536,6 +536,14 @@ class MainActivity : Activity() {
             speechController?.speakHindi(getString(R.string.test_speech_phrase))
         }
 
+        val speechRate = card(parent)
+        addSettingHeading(speechRate, R.drawable.ic_speaker, R.color.language_surface,
+            getString(R.string.speech_rate_title), getString(R.string.speech_rate_description))
+        addSpeechRateSlider(speechRate)
+        addAction(speechRate, getString(R.string.test_speech_rate), primary = false, enabled = hindiVoiceReady) {
+            speechController?.speakHindi(getString(R.string.test_speech_phrase))
+        }
+
         val language = card(parent)
         addSettingHeading(language, R.drawable.ic_language, R.color.language_surface,
             getString(R.string.app_language), getString(R.string.language_choice_hint))
@@ -678,6 +686,34 @@ class MainActivity : Activity() {
         }
         parent.addView(slider)
         addText(parent, getString(R.string.speech_boost_range), 13f, R.color.muted_ink, top = 2)
+    }
+
+    private fun addSpeechRateSlider(parent: LinearLayout) {
+        val percent = AppPreferences.speechRatePercent(this)
+        val label = makeTextView(getString(R.string.speech_rate_value, percent), 16f, R.color.ink, medium = true)
+        parent.addView(label, margin(top = 10, bottom = 4))
+        val slider = SeekBar(this).apply {
+            max = 6
+            progress = (percent - 70) / 5
+            contentDescription = getString(R.string.speech_rate_title)
+            minimumHeight = dp(52)
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                    val selected = 70 + progress * 5
+                    label.text = getString(R.string.speech_rate_value, selected)
+                    if (fromUser) {
+                        AppPreferences.setSpeechRatePercent(this@MainActivity, selected)
+                        speechController?.setSpeechRatePercent(selected)
+                        sendBroadcast(Intent(SpeechActions.SET_SPEECH_RATE).setPackage(packageName)
+                            .putExtra(SpeechActions.EXTRA_SPEECH_RATE_PERCENT, selected))
+                    }
+                }
+                override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
+                override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
+            })
+        }
+        parent.addView(slider)
+        addText(parent, getString(R.string.speech_rate_range), 13f, R.color.muted_ink, top = 2)
     }
 
     private fun addLanguageChoice(parent: LinearLayout, language: String, label: String) {

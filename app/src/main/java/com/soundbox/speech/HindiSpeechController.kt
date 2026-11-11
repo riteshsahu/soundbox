@@ -17,8 +17,9 @@ class HindiSpeechController(
     context: Context,
     private val onReadinessChanged: (Boolean) -> Unit,
     private val onBoostAvailabilityChanged: (Boolean?) -> Unit = {},
-    initialBoostEnabled: Boolean = false
-    , initialBoostDb: Int = 12
+    initialBoostEnabled: Boolean = false,
+    initialBoostDb: Int = 12,
+    initialSpeechRatePercent: Int = 85
 ) {
     private val appContext = context.applicationContext
     private val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -31,6 +32,7 @@ class HindiSpeechController(
     private var textToSpeech: TextToSpeech? = null
     private var loudnessEnhancer: LoudnessEnhancer? = null
     private var boostGainDb = if (initialBoostEnabled) initialBoostDb.coerceIn(6, 48) else 0
+    private var speechRatePercent = initialSpeechRatePercent.coerceIn(70, 100)
     private var focusRequest: AudioFocusRequest? = null
     private var focusHeld = false
     private var waitingForFocus = false
@@ -73,6 +75,7 @@ class HindiSpeechController(
                 val localeStatus = engine!!.setLanguage(voice!!.locale)
                 if (localeStatus >= TextToSpeech.LANG_AVAILABLE) {
                     engine.voice = voice
+                    engine.setSpeechRate(speechRatePercent / 100f)
                     engine.setAudioAttributes(
                         AudioAttributes.Builder()
                             .setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY)
@@ -122,6 +125,11 @@ class HindiSpeechController(
         }
         if (!isReady) return null
         return applyBoost()
+    }
+
+    fun setSpeechRatePercent(percent: Int) {
+        speechRatePercent = percent.coerceIn(70, 100)
+        textToSpeech?.setSpeechRate(speechRatePercent / 100f)
     }
 
     fun shutdown() {

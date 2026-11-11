@@ -171,4 +171,9 @@
     <string name="custom_date_range">Date range</string>
     <string name="speech_boost_level">Speech boost</string>
     <string name="speech_boost_range">0 dB to +48 dB, in 6 dB steps</string>
+    <string name="speech_rate_title">Speaking speed</string>
+    <string name="speech_rate_description">Slow down Hindi announcements</string>
+    <string name="speech_rate_value">%1$d%% of normal speed</string>
+    <string name="speech_rate_range">70%% (slowest) to 100%% (normal)</string>
+    <string name="test_speech_rate">Test this speaking speed</string>
 </resources>

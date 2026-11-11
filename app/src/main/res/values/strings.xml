@@ -171,4 +171,9 @@
     <string name="custom_date_range">तारीख़ सीमा</string>
     <string name="speech_boost_level">आवाज़ बढ़ाएँ</string>
     <string name="speech_boost_range">0 dB से +48 dB तक, 6 dB के चरणों में</string>
+    <string name="speech_rate_title">बोलने की गति</string>
+    <string name="speech_rate_description">हिंदी घोषणाओं को धीमा करें</string>
+    <string name="speech_rate_value">सामान्य गति का %1$d%%</string>
+    <string name="speech_rate_range">70%% (सबसे धीमा) से 100%% (सामान्य)</string>
+    <string name="test_speech_rate">इस गति को सुनें</string>
 </resources>

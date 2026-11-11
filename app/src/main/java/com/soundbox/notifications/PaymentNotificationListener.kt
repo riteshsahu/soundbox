@@ -30,13 +30,18 @@ class PaymentNotificationListener : NotificationListenerService() {
                         AppPreferences.loudnessBoostDb(applicationContext)
                     ))
                 }
+                SpeechActions.SET_SPEECH_RATE -> speechController.setSpeechRatePercent(
+                    intent.getIntExtra(SpeechActions.EXTRA_SPEECH_RATE_PERCENT,
+                        AppPreferences.speechRatePercent(applicationContext))
+                )
                 SpeechActions.REFRESH_LOCAL_HINDI_VOICE -> {
                     speechController.shutdown()
                     speechController = HindiSpeechController(
                         context = applicationContext,
                         onReadinessChanged = {},
                         initialBoostEnabled = AppPreferences.loudnessBoostDb(applicationContext) > 0,
-                        initialBoostDb = AppPreferences.loudnessBoostDb(applicationContext)
+                        initialBoostDb = AppPreferences.loudnessBoostDb(applicationContext),
+                        initialSpeechRatePercent = AppPreferences.speechRatePercent(applicationContext)
                     )
                 }
             }
@@ -50,6 +55,7 @@ class PaymentNotificationListener : NotificationListenerService() {
             .apply {
                 addAction(SpeechActions.STOP_QUEUED_ANNOUNCEMENTS)
                 addAction(SpeechActions.SET_LOUDNESS_BOOST)
+                addAction(SpeechActions.SET_SPEECH_RATE)
             }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(refreshVoiceReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
@@ -60,7 +66,9 @@ class PaymentNotificationListener : NotificationListenerService() {
         speechController = HindiSpeechController(
             context = applicationContext,
             onReadinessChanged = {},
-            initialBoostEnabled = AppPreferences.loudnessBoostEnabled(applicationContext)
+            initialBoostEnabled = AppPreferences.loudnessBoostDb(applicationContext) > 0,
+            initialBoostDb = AppPreferences.loudnessBoostDb(applicationContext),
+            initialSpeechRatePercent = AppPreferences.speechRatePercent(applicationContext)
         )
         historyRepository = PaymentHistoryRepository(applicationContext)
     }

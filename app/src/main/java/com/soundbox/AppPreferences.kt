@@ -12,6 +12,8 @@ object AppPreferences {
     const val LOUDNESS_BOOST_DB = "loudness_boost_db"
     const val MAX_LOUDNESS_BOOST_DB = 48
     const val LOUDNESS_BOOST_STEP_DB = 6
+    const val SPEECH_RATE_PERCENT = "speech_rate_percent"
+    const val DEFAULT_SPEECH_RATE_PERCENT = 85
 
     fun uiLanguage(context: Context): String = context
         .getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
@@ -56,6 +58,17 @@ object AppPreferences {
         context.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE).edit()
             .putInt(LOUDNESS_BOOST_DB, value)
             .putBoolean(LOUDNESS_BOOST_ENABLED, value > 0)
+            .apply()
+    }
+
+    fun speechRatePercent(context: Context): Int = context
+        .getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
+        .getInt(SPEECH_RATE_PERCENT, DEFAULT_SPEECH_RATE_PERCENT)
+        .coerceIn(70, 100)
+
+    fun setSpeechRatePercent(context: Context, percent: Int) {
+        context.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE).edit()
+            .putInt(SPEECH_RATE_PERCENT, percent.coerceIn(70, 100))
             .apply()
     }
 
