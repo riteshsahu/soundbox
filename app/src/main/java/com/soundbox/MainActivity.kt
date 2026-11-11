@@ -9,6 +9,7 @@ import android.content.Intent
 import android.content.Context
 import android.content.res.Configuration
 import android.database.sqlite.SQLiteException
+import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
@@ -19,7 +20,9 @@ import android.view.Gravity
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.ImageView
 import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.ScrollView
@@ -46,7 +49,7 @@ import java.math.BigDecimal
 import java.math.RoundingMode
 
 class MainActivity : Activity() {
-    private enum class Screen { HOME, SETUP, HISTORY }
+    private enum class Screen { HOME, HISTORY, SETTINGS, PRIVACY }
 
     private var currentScreen = Screen.HOME
     private var hindiVoiceReady = false
@@ -64,6 +67,7 @@ class MainActivity : Activity() {
     private var minimumAmountPaise: Long? = null
     private var maximumAmountPaise: Long? = null
     private var historyFilterError: String? = null
+    private var historyFiltersExpanded = false
     private var historyStorageError = false
     private var paymentEventsReceiverRegistered = false
 
@@ -84,10 +88,18 @@ class MainActivity : Activity() {
     private lateinit var page: LinearLayout
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        currentScreen = savedInstanceState?.getString(STATE_SCREEN)
+            ?.let { runCatching { Screen.valueOf(it) }.getOrNull() }
+            ?: Screen.HOME
         historyRepository = PaymentHistoryRepository(this)
         resetHistoryFilters()
         initializeSpeechController()
-        showScreen(Screen.HOME)
+        showScreen(currentScreen)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putString(STATE_SCREEN, currentScreen.name)
+        super.onSaveInstanceState(outState)
     }
 
     override fun onStart() {
@@ -120,6 +132,15 @@ class MainActivity : Activity() {
         super.onDestroy()
     }
 
+    @Suppress("DEPRECATION")
+    override fun onBackPressed() {
+        when (currentScreen) {
+            Screen.HISTORY, Screen.SETTINGS -> showScreen(Screen.HOME)
+            Screen.PRIVACY -> showScreen(Screen.SETTINGS)
+            Screen.HOME -> super.onBackPressed()
+        }
+    }
+
     override fun onStop() {
         if (paymentEventsReceiverRegistered) {
             unregisterReceiver(paymentEventsReceiver)
@@ -143,152 +164,349 @@ class MainActivity : Activity() {
         }
         page = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         scroll.addView(page)
-        addHeader(page)
-        addStageNotice(page)
-
         when (screen) {
             Screen.HOME -> addHome(page)
-            Screen.SETUP -> addSetup(page)
             Screen.HISTORY -> addHistory(page)
+            Screen.SETTINGS -> addSettings(page)
+            Screen.PRIVACY -> addPrivacy(page)
         }
 
         root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
-        root.addView(createNavigation(screen))
         setContentView(root)
     }
 
-    private fun addHeader(parent: LinearLayout) {
-        val heading = LinearLayout(this).apply {
+    private fun addHomeHeader(parent: LinearLayout) {
+        val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, 0, 0, dp(12))
+            setPadding(0, 0, 0, dp(18))
         }
-        val brand = TextView(this).apply {
-            text = "SoundBox"
-            textSize = 29f
-            setTextColor(getColor(R.color.ink))
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-            contentDescription = getString(R.string.brand_accessibility)
+        val spacer = View(this)
+        row.addView(spacer, LinearLayout.LayoutParams(0, dp(46), 1f))
+        addIconButton(row, R.drawable.ic_nav_settings, getString(R.string.open_settings), R.color.lime) {
+            showScreen(Screen.SETTINGS)
         }
-        val languageButton = Button(this).apply {
-            text = getString(R.string.switch_language)
-            textSize = 14f
-            isAllCaps = false
-            minHeight = dp(48)
-            setTextColor(getColor(R.color.forest_dark))
-            background = rounded(R.color.mint, 18)
-            contentDescription = getString(R.string.switch_language_accessibility)
-            setOnClickListener { toggleLanguage() }
-        }
-        heading.addView(brand, LinearLayout.LayoutParams(0, -2, 1f))
-        heading.addView(languageButton)
-        parent.addView(heading)
+        parent.addView(row)
     }
 
-    private fun addStageNotice(parent: LinearLayout) {
-        val notice = TextView(this).apply {
-            text = getString(R.string.stage_notice)
-            textSize = 15f
-            setTextColor(getColor(R.color.amber))
-            background = rounded(R.color.amber_surface, 16)
-            setPadding(dp(14), dp(12), dp(14), dp(12))
-            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_NONE
+    private fun addPageHeader(
+        parent: LinearLayout,
+        eyebrow: String,
+        title: String,
+        backScreen: Screen,
+        trailingIcon: Int? = null,
+        trailingDescription: String? = null,
+        trailingAction: (() -> Unit)? = null
+    ) {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, 0, 0, dp(18))
         }
-        parent.addView(notice, margin(bottom = 18))
+        val backIcon = iconImage(R.drawable.ic_arrow_back, R.color.ink)
+        val back = LinearLayout(this).apply {
+            gravity = Gravity.CENTER
+            background = rounded(R.color.surface, 13, R.color.line)
+            minimumWidth = dp(44)
+            minimumHeight = dp(44)
+            isClickable = true
+            isFocusable = true
+            contentDescription = getString(R.string.back_accessibility)
+            setOnClickListener { showScreen(backScreen) }
+            addView(backIcon, LinearLayout.LayoutParams(dp(21), dp(21)))
+        }
+        row.addView(back, LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginEnd = dp(10) })
+
+        val titleGroup = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        addText(titleGroup, eyebrow, 11f, R.color.forest, medium = true, bottom = 1)
+        addText(titleGroup, title, 23f, R.color.ink, medium = true, bottom = 0)
+        row.addView(titleGroup, LinearLayout.LayoutParams(0, -2, 1f))
+        if (trailingIcon != null && trailingDescription != null && trailingAction != null) {
+            addIconButton(row, trailingIcon, trailingDescription, R.color.surface, trailingAction)
+        }
+        parent.addView(row)
+    }
+
+    private fun addIconButton(
+        parent: LinearLayout,
+        icon: Int,
+        description: String,
+        backgroundColor: Int,
+        action: () -> Unit
+    ) {
+        val button = LinearLayout(this).apply {
+            gravity = Gravity.CENTER
+            background = rounded(backgroundColor, 16, if (backgroundColor == R.color.surface) R.color.line else null)
+            minimumWidth = dp(48)
+            minimumHeight = dp(48)
+            isClickable = true
+            isFocusable = true
+            contentDescription = description
+            setOnClickListener { action() }
+            addView(iconImage(icon, R.color.forest_dark), LinearLayout.LayoutParams(dp(22), dp(22)))
+        }
+        parent.addView(button)
+    }
+
+    private fun iconImage(resource: Int, tint: Int): ImageView = ImageView(this).apply {
+        setImageResource(resource)
+        setColorFilter(getColor(tint))
+        contentDescription = null
     }
 
     private fun addHome(parent: LinearLayout) {
-        addTitle(parent, getString(R.string.home_title), getString(R.string.home_subtitle))
+        addHomeHeader(parent)
 
-        val status = card(parent)
-        addLabel(status, getString(R.string.listening_status))
-        val listeningReady = NotificationAccess.isEnabled(this)
-        addText(
-            status,
-            getString(if (listeningReady) R.string.listening_active else R.string.listening_needs_setup),
-            24f,
-            R.color.ink,
-            medium = true
-        )
-        addText(
-            status,
-            getString(if (NotificationAccess.isEnabled(this)) R.string.listener_ready else R.string.listener_not_ready),
-            16f,
-            R.color.muted_ink
-        )
-        addText(
-            status,
-            getString(if (hindiVoiceReady) R.string.offline_voice_ready else R.string.offline_voice_missing),
-            16f,
-            R.color.muted_ink
-        )
-        addText(
-            status,
-            getString(if (AppPreferences.announcementsEnabled(this)) R.string.announcements_enabled else R.string.announcements_disabled),
-            16f,
-            R.color.muted_ink
-        )
-        addAction(status, getString(R.string.view_setup), primary = true) { showScreen(Screen.SETUP) }
+        val notificationAccessEnabled = NotificationAccess.isEnabled(this)
+        if (!notificationAccessEnabled) addNotificationAccessCard(parent)
+        val announcementsEnabled = AppPreferences.announcementsEnabled(this)
+        val announcementReady = notificationAccessEnabled && announcementsEnabled
 
-        val total = card(parent)
-        addLabel(total, getString(R.string.today_total))
+        val total = FrameLayout(this).apply {
+            background = rounded(if (announcementReady) R.color.forest_dark else R.color.paused_hero, 27)
+            clipToOutline = true
+        }
+        val heroRing = View(this).apply {
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.TRANSPARENT)
+                setStroke(dp(24), getColor(R.color.lime))
+            }
+            alpha = 0.08f
+            translationX = dp(70).toFloat()
+        }
+        total.addView(
+            heroRing,
+            FrameLayout.LayoutParams(dp(180), dp(180), Gravity.END or Gravity.TOP).apply {
+                topMargin = dp(10)
+            }
+        )
+        val totalContent = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(19), dp(20), dp(16))
+        }
+        total.addView(totalContent, FrameLayout.LayoutParams(-1, -2))
+        parent.addView(total, margin(bottom = 14))
+        val statusRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val dot = View(this).apply {
+            background = rounded(if (announcementReady) R.color.lime else R.color.boost_orange, 20)
+        }
+        statusRow.addView(dot, LinearLayout.LayoutParams(dp(9), dp(9)).apply { marginEnd = dp(8) })
+        val statusText = TextView(this).apply {
+            text = getString(
+                when {
+                    !notificationAccessEnabled -> R.string.listening_needs_setup
+                    announcementsEnabled -> R.string.announcements_enabled
+                    else -> R.string.announcements_disabled
+                }
+            )
+            textSize = 14f
+            setTextColor(getColor(if (announcementReady) R.color.lime else R.color.hero_muted))
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        }
+        statusRow.addView(statusText)
+        totalContent.addView(statusRow, margin(bottom = 20))
+        addText(totalContent, getString(R.string.today_total), 15f, R.color.hero_muted, medium = true, bottom = 2)
         val todayTotalPaise = readHistory(0L) { historyRepository?.todayTotal() ?: 0L }
-        if (historyStorageError) {
-            addText(total, getString(R.string.history_storage_error), 17f, R.color.amber)
-        } else {
-            addText(total, formatAmount(todayTotalPaise), 34f, R.color.forest_dark, medium = true)
+        val todayBounds = PaymentHistoryRules.localDayBounds(System.currentTimeMillis())
+        val todayPaymentCount = readHistory(0) {
+            historyRepository?.history(
+                PaymentHistoryFilter(todayBounds.startInclusiveMillis, todayBounds.endExclusiveMillis)
+            )?.size ?: 0
         }
-        addText(total, getString(R.string.local_date_note), 15f, R.color.muted_ink)
+        if (historyStorageError) {
+            addText(totalContent, getString(R.string.history_storage_error), 17f, R.color.hero_error)
+        } else {
+            addText(totalContent, formatAmount(todayTotalPaise), 40f, R.color.surface, medium = true, bottom = 2)
+        }
+        val meta = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val paymentCountText = makeTextView(getString(R.string.today_payment_count, todayPaymentCount), 14f, R.color.hero_muted)
+        meta.addView(paymentCountText, LinearLayout.LayoutParams(-2, -2))
+        meta.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
+        val localDateText = makeTextView(getString(R.string.today_date_label, formatDate(System.currentTimeMillis())), 13f, R.color.hero_muted)
+        meta.addView(localDateText, LinearLayout.LayoutParams(-2, -2))
+        totalContent.addView(meta)
+        addSoundWave(total)
 
-        val latest = card(parent)
-        addLabel(latest, getString(R.string.latest_payment))
-        val latestPayment = readHistory(null as PaymentRecord?) { historyRepository?.latestPayment() }
-        if (historyStorageError) {
-            addText(latest, getString(R.string.history_storage_error), 17f, R.color.amber)
-        } else if (latestPayment == null) {
-            addText(latest, getString(R.string.no_payment_recorded), 19f, R.color.ink, medium = true)
-        } else {
-            addText(latest, formatAmount(latestPayment.amountPaise), 24f, R.color.ink, medium = true)
-            addText(latest, getString(R.string.last_payment_source, latestPayment.sourceApp), 16f, R.color.muted_ink)
-            addText(latest, formatDateTime(latestPayment.receivedAtMillis), 15f, R.color.muted_ink)
+        val latestSection = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        addText(latestSection, getString(R.string.latest_payments), 19f, R.color.ink, medium = true, bottom = 8)
+        val retainedStart = PaymentHistoryRules.localDayBounds(
+            PaymentHistoryRules.retentionCutoff(System.currentTimeMillis())
+        ).startInclusiveMillis
+        val recentPayments = readHistory(emptyList()) {
+            historyRepository?.history(
+                PaymentHistoryFilter(retainedStart, PaymentHistoryRules.localDayBounds(System.currentTimeMillis()).endExclusiveMillis)
+            )?.take(3) ?: emptyList()
         }
-        addAction(latest, getString(R.string.view_history), primary = false) { showScreen(Screen.HISTORY) }
+        if (historyStorageError) {
+            addText(latestSection, getString(R.string.history_storage_error), 17f, R.color.amber)
+        } else if (recentPayments.isEmpty()) {
+            addEmptyPaymentState(
+                latestSection,
+                getString(R.string.no_payment_recorded),
+                getString(R.string.empty_history_body),
+                compact = true
+            )
+        } else {
+            val transactionList = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                background = rounded(R.color.surface, 20, R.color.line)
+                clipToOutline = true
+            }
+            recentPayments.forEachIndexed { index, record ->
+                addPaymentRecord(transactionList, record, compact = true, listRow = true)
+                if (index < recentPayments.lastIndex) {
+                    View(this).apply { setBackgroundColor(getColor(R.color.segment_surface)) }
+                        .also { transactionList.addView(it, LinearLayout.LayoutParams(-1, dp(1)).apply {
+                            marginStart = dp(12)
+                            marginEnd = dp(12)
+                        }) }
+                }
+            }
+            latestSection.addView(transactionList)
+        }
+        addHistoryButton(latestSection)
+        parent.addView(latestSection)
     }
 
-    private fun addSetup(parent: LinearLayout) {
-        addTitle(parent, getString(R.string.setup_title), getString(R.string.setup_subtitle))
+    private fun addNotificationAccessCard(parent: LinearLayout) {
+        val notice = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = rounded(R.color.access_surface, 18, R.color.access_line)
+            setPadding(dp(13), dp(12), dp(13), dp(12))
+        }
+        notice.addView(iconImage(R.drawable.ic_bell, R.color.access_ink), LinearLayout.LayoutParams(dp(27), dp(27)).apply {
+            marginEnd = dp(10)
+        })
+        val copy = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        addText(copy, getString(R.string.access_step_title), 15f, R.color.ink, medium = true, bottom = 1)
+        addText(copy, getString(R.string.access_step_body), 13f, R.color.muted_ink, bottom = 0)
+        notice.addView(copy, LinearLayout.LayoutParams(0, -2, 1f))
+        val enable = TextView(this).apply {
+            text = getString(R.string.enable_short)
+            textSize = 14f
+            setTextColor(getColor(R.color.surface))
+            gravity = Gravity.CENTER
+            background = rounded(R.color.access_ink, 12)
+            setPadding(dp(11), dp(8), dp(11), dp(8))
+            isClickable = true
+            isFocusable = true
+            contentDescription = getString(R.string.enable_notification_access)
+            setOnClickListener { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
+        }
+        notice.addView(enable, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(8) })
+        parent.addView(notice, margin(bottom = 13))
+    }
 
-        val language = card(parent)
-        addLabel(language, getString(R.string.app_language))
-        addText(language, getString(R.string.language_choice_hint), 16f, R.color.muted_ink)
-        addLanguageChoice(language, AppPreferences.HINDI_LANGUAGE, getString(R.string.hindi))
-        addLanguageChoice(language, AppPreferences.ENGLISH_LANGUAGE, getString(R.string.english))
+    private fun addSoundWave(parent: FrameLayout) {
+        val wave = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            contentDescription = null
+            alpha = 0.18f
+        }
+        listOf(10, 20, 13, 30, 22, 39, 25, 48, 31, 18, 27, 15, 20, 11).forEach { height ->
+            val bar = View(this).apply { background = rounded(R.color.lime, 8) }
+            wave.addView(bar, LinearLayout.LayoutParams(dp(3), dp(height)).apply { marginEnd = dp(3) })
+        }
+        parent.addView(
+            wave,
+            FrameLayout.LayoutParams(-2, dp(52), Gravity.END or Gravity.BOTTOM).apply {
+                marginEnd = dp(18)
+                bottomMargin = dp(56)
+            }
+        )
+    }
 
-        val notification = card(parent)
-        addLabel(notification, getString(R.string.notification_access))
-        val accessEnabled = NotificationAccess.isEnabled(this)
-        addText(
-            notification,
-            getString(if (accessEnabled) R.string.listener_ready else R.string.listener_not_ready),
-            21f,
-            R.color.ink,
-            medium = true
+    private fun addHistoryButton(parent: LinearLayout) {
+        val button = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            background = rounded(R.color.setting_teal_surface, 14, R.color.forest)
+            minimumHeight = dp(48)
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+            isClickable = true
+            isFocusable = true
+            contentDescription = getString(R.string.view_full_history)
+            setOnClickListener { showScreen(Screen.HISTORY) }
+        }
+        val label = makeTextView(getString(R.string.view_full_history), 15f, R.color.forest, medium = true)
+        button.addView(label)
+        button.addView(
+            iconImage(R.drawable.ic_chevron, R.color.forest),
+            LinearLayout.LayoutParams(dp(20), dp(20)).apply { marginStart = dp(4) }
         )
-        addText(
-            notification,
-            getString(R.string.notification_access_explanation),
-            16f,
-            R.color.muted_ink
+        parent.addView(button, margin(top = 10))
+    }
+
+    private fun addSettings(parent: LinearLayout) {
+        addPageHeader(parent, getString(R.string.settings_eyebrow), getString(R.string.settings_title), Screen.HOME)
+
+        val announcements = card(parent)
+        addToggleSetting(
+            announcements,
+            R.drawable.ic_speaker,
+            getString(R.string.announcement_setting),
+            getString(R.string.announcement_description)
         )
-        addText(notification, getString(R.string.notification_access_scope), 15f, R.color.muted_ink)
-        addAction(notification, getString(R.string.enable_notification_access), primary = true) {
-            startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+        addAction(announcements, getString(R.string.test_speech), primary = false, enabled = hindiVoiceReady) {
+            speechController?.speakHindi(getString(R.string.test_speech_phrase))
+        }
+        addInlineInfo(announcements, getString(R.string.announcements_hindi_only))
+        addText(announcements, getString(R.string.announcement_off_history_on), 13f, R.color.muted_ink, top = 5, bottom = 0)
+
+        addSectionLabel(parent, getString(R.string.sound_language_section))
+        val loudness = card(parent)
+        addSettingHeading(loudness, R.drawable.ic_volume, R.color.boost_surface,
+            getString(R.string.loudness_boost), getString(R.string.boost_short_description))
+        addLoudnessSegment(loudness)
+        addText(
+            loudness,
+            getString(
+                when {
+                    !AppPreferences.loudnessBoostEnabled(this) -> R.string.boost_effect_normal
+                    boostAvailable == true -> R.string.boost_effect_available
+                    boostAvailable == false -> R.string.boost_effect_unavailable
+                    else -> R.string.boost_effect_not_checked
+                }
+            ),
+            14f,
+            R.color.muted_ink,
+            top = 8
+        )
+        addText(loudness, getString(R.string.boost_device_note), 13f, R.color.muted_ink, top = 4)
+        addAction(loudness, getString(R.string.test_selected_sound), primary = false, enabled = hindiVoiceReady) {
+            speechController?.speakHindi(getString(R.string.test_speech_phrase))
         }
 
-        val speech = card(parent)
-        addLabel(speech, getString(R.string.hindi_voice))
-        addText(
-            speech,
+        val language = card(parent)
+        addSettingHeading(language, R.drawable.ic_language, R.color.language_surface,
+            getString(R.string.app_language), getString(R.string.language_choice_hint))
+        addLanguageChoice(language, AppPreferences.ENGLISH_LANGUAGE, getString(R.string.english))
+        addLanguageChoice(language, AppPreferences.HINDI_LANGUAGE, getString(R.string.hindi))
+
+        addSectionLabel(parent, getString(R.string.system_support_section))
+        val support = card(parent)
+        addSupportRow(
+            support,
+            R.drawable.ic_bell,
+            getString(R.string.notification_access),
+            getString(if (NotificationAccess.isEnabled(this)) R.string.listener_ready else R.string.listener_not_ready),
+            if (NotificationAccess.isEnabled(this)) R.color.status_green else R.color.status_amber
+        ) {
+            startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+        }
+        addSupportRow(
+            support,
+            R.drawable.ic_check,
+            getString(R.string.hindi_voice),
             getString(
                 when {
                     hindiVoiceReady -> R.string.offline_voice_ready
@@ -296,205 +514,520 @@ class MainActivity : Activity() {
                     else -> R.string.offline_voice_missing
                 }
             ),
-            21f,
-            R.color.ink,
-            medium = true
-        )
-        addText(
-            speech,
-            getString(R.string.voice_explanation),
-            16f,
-            R.color.muted_ink
-        )
-        addAction(speech, getString(R.string.test_speech), primary = true, enabled = hindiVoiceReady) {
-            speechController?.speakHindi(getString(R.string.test_speech_phrase))
+            if (hindiVoiceReady) R.color.status_green else R.color.status_amber
+        ) {
+            if (hindiVoiceReady) speechController?.speakHindi(getString(R.string.test_speech_phrase))
+            else openHindiVoiceSettings()
         }
-        if (ttsCheckComplete && !hindiVoiceReady) {
-            addAction(speech, getString(R.string.open_voice_settings), primary = false) {
-                openHindiVoiceSettings()
-            }
-        }
-
-        val announcements = card(parent)
-        addLabel(announcements, getString(R.string.announcement_setting))
-        addAnnouncementsSwitch(announcements)
-
-        val loudness = card(parent)
-        addLabel(loudness, getString(R.string.loudness_boost))
-        addText(loudness, getString(R.string.boost_device_note), 15f, R.color.muted_ink)
-        val boostState = AppPreferences.loudnessBoostEnabled(this)
-        addText(
-            loudness,
-            getString(
-                when {
-                    !boostState -> R.string.boost_effect_normal
-                    boostAvailable == true -> R.string.boost_effect_available
-                    boostAvailable == false -> R.string.boost_effect_unavailable
-                    else -> R.string.boost_effect_not_checked
-                }
-            ),
-            16f,
-            R.color.muted_ink
-        )
-        val loudnessChoices = RadioGroup(this).apply { orientation = RadioGroup.VERTICAL }
-        addLoudnessChoice(loudnessChoices, enabled = false, label = getString(R.string.normal_sound))
-        addLoudnessChoice(loudnessChoices, enabled = true, label = getString(R.string.boosted_sound))
-        loudness.addView(loudnessChoices, margin(top = 4))
-        addAction(loudness, getString(R.string.test_selected_sound), primary = false, enabled = hindiVoiceReady) {
-            speechController?.speakHindi(getString(R.string.test_speech_phrase))
-        }
-
-        val privacy = card(parent)
-        addLabel(privacy, getString(R.string.your_information))
-        addText(privacy, getString(R.string.allowlist_privacy), 17f, R.color.ink)
-        addText(privacy, getString(R.string.local_only_no_notification_text), 15f, R.color.muted_ink)
+        addSupportRow(
+            support,
+            R.drawable.ic_shield,
+            getString(R.string.privacy_data),
+            getString(R.string.privacy_data_summary),
+            R.color.status_slate
+        ) { showScreen(Screen.PRIVACY) }
+        addText(parent, getString(R.string.app_version), 13f, R.color.muted_ink, top = 8, bottom = 20)
     }
 
-    private fun addLanguageChoice(parent: LinearLayout, language: String, label: String) {
-        val isSelected = getUiLanguage() == language
-        val button = Button(this).apply {
-            text = if (isSelected) getString(R.string.selected_format, label) else label
-            textSize = 16f
-            isAllCaps = false
-            minHeight = dp(52)
-            contentDescription = text
-            setTextColor(getColor(if (isSelected) R.color.surface else R.color.forest_dark))
-            background = rounded(if (isSelected) R.color.forest else R.color.mint, 14)
-            setOnClickListener { setUiLanguage(language) }
-        }
-        parent.addView(button, margin(top = 4, bottom = 4))
-    }
-
-    private fun addAnnouncementsSwitch(parent: LinearLayout) {
-        val announcementsSwitch = Switch(this).apply {
-            text = getString(R.string.announcements_switch_label)
-            textSize = 17f
+    private fun addToggleSetting(parent: LinearLayout, icon: Int, title: String, subtitle: String) {
+        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        addSettingIcon(row, icon, R.color.setting_teal)
+        val copy = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        addText(copy, title, 17f, R.color.ink, medium = true, bottom = 2)
+        addText(copy, subtitle, 14f, R.color.muted_ink, bottom = 0)
+        row.addView(copy, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(10) })
+        val toggle = Switch(this).apply {
+            contentDescription = title
             minHeight = dp(52)
             isChecked = AppPreferences.announcementsEnabled(this@MainActivity)
             setOnCheckedChangeListener { _, enabled ->
                 AppPreferences.setAnnouncementsEnabled(this@MainActivity, enabled)
-                if (!enabled) {
-                    sendBroadcast(
-                        Intent(SpeechActions.STOP_QUEUED_ANNOUNCEMENTS).setPackage(packageName)
-                    )
-                }
+                if (!enabled) sendBroadcast(Intent(SpeechActions.STOP_QUEUED_ANNOUNCEMENTS).setPackage(packageName))
                 showScreen(currentScreen)
             }
         }
-        parent.addView(announcementsSwitch, margin(top = 4))
-        addText(
-            parent,
-            getString(R.string.announcement_off_history_on),
-            15f,
-            R.color.muted_ink
-        )
+        row.addView(toggle)
+        parent.addView(row)
     }
 
-    private fun addLoudnessChoice(parent: RadioGroup, enabled: Boolean, label: String) {
-        val choice = RadioButton(this).apply {
-            text = label
-            textSize = 17f
-            minHeight = dp(52)
-            isChecked = AppPreferences.loudnessBoostEnabled(this@MainActivity) == enabled
-            setOnClickListener {
-                AppPreferences.setLoudnessBoostEnabled(this@MainActivity, enabled)
-                boostAvailable = speechController?.setBoostEnabled(enabled)
-                sendBroadcast(
-                    Intent(SpeechActions.SET_LOUDNESS_BOOST)
-                        .setPackage(packageName)
-                        .putExtra(SpeechActions.EXTRA_BOOST_ENABLED, enabled)
-                )
-                showScreen(currentScreen)
-            }
+    private fun addSettingHeading(parent: LinearLayout, icon: Int, iconBackground: Int, title: String, subtitle: String) {
+        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        addSettingIcon(row, icon, iconBackground)
+        val copy = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        addText(copy, title, 17f, R.color.ink, medium = true, bottom = 2)
+        addText(copy, subtitle, 14f, R.color.muted_ink, bottom = 0)
+        row.addView(copy, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(10) })
+        parent.addView(row, margin(bottom = 12))
+    }
+
+    private fun addSettingIcon(parent: LinearLayout, icon: Int, color: Int) {
+        val (backgroundColor, tintColor) = when (color) {
+            R.color.setting_teal -> R.color.setting_teal_surface to R.color.setting_teal
+            R.color.boost_surface -> R.color.boost_surface to R.color.access_ink
+            R.color.language_surface -> R.color.language_surface to R.color.setting_violet
+            R.color.status_green -> R.color.status_green_surface to R.color.status_green
+            R.color.status_amber -> R.color.status_amber_surface to R.color.status_amber
+            R.color.status_coral -> R.color.status_coral_surface to R.color.status_coral
+            R.color.status_slate -> R.color.status_slate_surface to R.color.status_slate
+            R.color.access_surface -> R.color.access_surface to R.color.access_ink
+            else -> color to R.color.forest
         }
-        parent.addView(choice, LinearLayout.LayoutParams(-1, -2).apply {
-            topMargin = dp(2)
-            bottomMargin = dp(2)
-        })
+        val tile = LinearLayout(this).apply {
+            gravity = Gravity.CENTER
+            background = rounded(backgroundColor, 14)
+        }
+        tile.addView(iconImage(icon, tintColor), LinearLayout.LayoutParams(dp(22), dp(22)))
+        parent.addView(tile, LinearLayout.LayoutParams(dp(44), dp(44)))
+    }
+
+    private fun addLoudnessSegment(parent: LinearLayout) {
+        val group = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = rounded(R.color.segment_surface, 13)
+            setPadding(dp(4), dp(4), dp(4), dp(4))
+        }
+        fun choice(enabled: Boolean, title: String, description: String) {
+            val selected = AppPreferences.loudnessBoostEnabled(this) == enabled
+            val option = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                minimumHeight = dp(68)
+                setPadding(dp(8), dp(8), dp(10), dp(8))
+                background = rounded(if (selected) R.color.surface else R.color.segment_surface, 10)
+                isClickable = true
+                isFocusable = true
+                isSelected = selected
+                contentDescription = if (selected) getString(R.string.selected_format, "$title. $description") else "$title. $description"
+                setOnClickListener {
+                    AppPreferences.setLoudnessBoostEnabled(this@MainActivity, enabled)
+                    boostAvailable = speechController?.setBoostEnabled(enabled)
+                    sendBroadcast(Intent(SpeechActions.SET_LOUDNESS_BOOST).setPackage(packageName)
+                        .putExtra(SpeechActions.EXTRA_BOOST_ENABLED, enabled))
+                    showScreen(currentScreen)
+                }
+            }
+            val radio = RadioButton(this).apply {
+                isChecked = selected
+                isClickable = false
+                isFocusable = false
+                contentDescription = null
+            }
+            option.addView(radio, LinearLayout.LayoutParams(dp(48), dp(48)))
+            val copy = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            addText(copy, title, 16f, R.color.ink, medium = true, bottom = 1)
+            addText(copy, description, 13f, R.color.muted_ink, bottom = 0)
+            option.addView(copy, LinearLayout.LayoutParams(0, -2, 1f))
+            group.addView(option, LinearLayout.LayoutParams(-1, -2).apply {
+                if (group.childCount > 0) topMargin = dp(4)
+            })
+        }
+        choice(
+            false,
+            getString(R.string.normal_sound),
+            getString(R.string.normal_sound_description)
+        )
+        choice(
+            true,
+            getString(R.string.boosted_sound),
+            getString(R.string.boosted_sound_description)
+        )
+        parent.addView(group)
+    }
+
+    private fun addLanguageChoice(parent: LinearLayout, language: String, label: String) {
+        val selected = getUiLanguage() == language
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(2), dp(10), dp(2), dp(10))
+            isClickable = true
+            isFocusable = true
+            isSelected = selected
+            contentDescription = if (selected) getString(R.string.selected_format, label) else label
+            setOnClickListener { setUiLanguage(language) }
+        }
+        val labelView = TextView(this).apply {
+            text = label
+            textSize = 16f
+            setTextColor(getColor(R.color.ink))
+        }
+        row.addView(labelView, LinearLayout.LayoutParams(0, -2, 1f))
+        val radio = RadioButton(this).apply { isChecked = selected; isClickable = false; contentDescription = null }
+        row.addView(radio)
+        parent.addView(row)
+    }
+
+    private fun addSupportRow(
+        parent: LinearLayout,
+        icon: Int,
+        title: String,
+        subtitle: String,
+        iconColor: Int,
+        action: () -> Unit
+    ) {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            minimumHeight = dp(68)
+            isClickable = true
+            isFocusable = true
+            contentDescription = "$title. $subtitle"
+            setOnClickListener { action() }
+        }
+        addSettingIcon(row, icon, iconColor)
+        val copy = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        addText(copy, title, 15f, R.color.ink, medium = true, bottom = 1)
+        addText(copy, subtitle, 13f, R.color.muted_ink, bottom = 0)
+        row.addView(copy, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(10) })
+        row.addView(iconImage(R.drawable.ic_chevron, R.color.muted_ink), LinearLayout.LayoutParams(dp(20), dp(20)))
+        parent.addView(row)
+        val divider = View(this).apply { setBackgroundColor(getColor(R.color.line)) }
+        parent.addView(divider, LinearLayout.LayoutParams(-1, dp(1)).apply { topMargin = dp(2); bottomMargin = dp(2) })
+    }
+
+    private fun addSectionLabel(parent: LinearLayout, text: String) {
+        val label = TextView(this).apply {
+            this.text = text
+            textSize = 12f
+            letterSpacing = 0.08f
+            setTextColor(getColor(R.color.muted_ink))
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            setPadding(dp(3), dp(7), dp(3), dp(7))
+        }
+        parent.addView(label, margin(top = 5, bottom = 4))
+    }
+
+    private fun addInlineInfo(parent: LinearLayout, text: String) {
+        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        row.addView(iconImage(R.drawable.ic_info, R.color.muted_ink), LinearLayout.LayoutParams(dp(17), dp(17)).apply { marginEnd = dp(6) })
+        row.addView(makeTextView(text, 13f, R.color.muted_ink), LinearLayout.LayoutParams(0, -2, 1f))
+        parent.addView(row, margin(top = 9))
+    }
+
+    private fun addPrivacy(parent: LinearLayout) {
+        addPageHeader(parent, getString(R.string.privacy_eyebrow), getString(R.string.privacy_title), Screen.SETTINGS)
+        val hero = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            background = rounded(R.color.forest_dark, 25)
+            setPadding(dp(20), dp(24), dp(20), dp(20))
+        }
+        parent.addView(hero, margin(bottom = 14))
+        val shield = LinearLayout(this).apply {
+            gravity = Gravity.CENTER
+            background = rounded(R.color.lime, 24)
+        }
+        shield.addView(iconImage(R.drawable.ic_shield, R.color.forest_dark), LinearLayout.LayoutParams(dp(45), dp(45)))
+        hero.addView(shield, LinearLayout.LayoutParams(dp(70), dp(70)).apply { bottomMargin = dp(12) })
+        addText(hero, getString(R.string.privacy_hero_title), 23f, R.color.surface, medium = true, bottom = 4)
+        addText(hero, getString(R.string.privacy_hero_body), 15f, R.color.hero_muted, bottom = 14)
+        val offlineBadge = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            background = GradientDrawable().apply {
+                setColor(Color.TRANSPARENT)
+                cornerRadius = dp(40).toFloat()
+                setStroke(dp(1), Color.argb(52, 255, 255, 255))
+            }
+            setPadding(dp(12), dp(7), dp(12), dp(7))
+        }
+        val offlineDot = View(this).apply { background = rounded(R.color.lime, 20) }
+        offlineBadge.addView(offlineDot, LinearLayout.LayoutParams(dp(7), dp(7)).apply { marginEnd = dp(7) })
+        offlineBadge.addView(makeTextView(getString(R.string.local_only_badge), 13f, R.color.surface, medium = true))
+        hero.addView(offlineBadge)
+
+        val privacyItems = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = rounded(R.color.surface, 20, R.color.line)
+            clipToOutline = true
+        }
+        addPrivacyItem(privacyItems, R.drawable.ic_phone, R.string.privacy_on_device_title, R.string.privacy_on_device_body, dividerAfter = true)
+        addPrivacyItem(privacyItems, R.drawable.ic_nav_history, R.string.privacy_minimal_title, R.string.privacy_minimal_body, dividerAfter = true)
+        addPrivacyItem(privacyItems, R.drawable.ic_lock, R.string.privacy_sensitive_title, R.string.privacy_sensitive_body)
+        parent.addView(privacyItems, margin(bottom = 14))
+
+        val access = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = rounded(R.color.access_surface, 17, R.color.access_line)
+            setPadding(dp(14), dp(14), dp(14), dp(14))
+        }
+        parent.addView(access, margin(bottom = 14))
+        addSettingHeading(access, R.drawable.ic_info, R.color.access_surface, getString(R.string.notification_access_scope_title),
+            getString(R.string.notification_access_scope))
+        addText(access, getString(R.string.notification_access_explanation), 14f, R.color.muted_ink, bottom = 0)
+
+        addSectionLabel(parent, getString(R.string.never_requests_title))
+        addPermissionChipRow(parent, listOf(
+            R.string.no_internet_permission,
+            R.string.no_sms_permission,
+            R.string.no_contacts_permission
+        ))
+        addPermissionChipRow(parent, listOf(
+            R.string.no_location_permission,
+            R.string.no_storage_permission,
+            R.string.no_account_permission
+        ))
+        addAction(parent, getString(R.string.done_action), primary = true) { showScreen(Screen.SETTINGS) }
+    }
+
+    private fun addPrivacyItem(parent: LinearLayout, icon: Int, titleRes: Int, bodyRes: Int, dividerAfter: Boolean = false) {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(14), dp(13), dp(14), dp(13))
+        }
+        addSettingIcon(row, icon, R.color.setting_teal)
+        val copy = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        addText(copy, getString(titleRes), 16f, R.color.ink, medium = true, bottom = 2)
+        addText(copy, getString(bodyRes), 14f, R.color.muted_ink, bottom = 0)
+        row.addView(copy, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(11) })
+        parent.addView(row)
+        if (dividerAfter) {
+            val divider = View(this).apply { setBackgroundColor(getColor(R.color.segment_surface)) }
+            parent.addView(divider, LinearLayout.LayoutParams(-1, dp(1)).apply {
+                marginStart = dp(65)
+                marginEnd = dp(14)
+            })
+        }
+    }
+
+    private fun addPermissionChipRow(parent: LinearLayout, permissionResources: List<Int>) {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        permissionResources.forEachIndexed { index, permissionResource ->
+            val chip = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                background = rounded(R.color.history_count_surface, 10)
+                setPadding(dp(8), dp(8), dp(6), dp(8))
+                contentDescription = getString(R.string.not_requested_accessibility, getString(permissionResource))
+            }
+            val xMark = makeTextView("×", 16f, R.color.status_slate, medium = true)
+            chip.addView(xMark, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(4) })
+            chip.addView(makeTextView(getString(permissionResource), 12f, R.color.status_slate, medium = true))
+            row.addView(chip, LinearLayout.LayoutParams(0, -2, 1f).apply {
+                if (index > 0) marginStart = dp(6)
+            })
+        }
+        parent.addView(row, margin(bottom = 6))
     }
 
     private fun addHistory(parent: LinearLayout) {
-        addTitle(parent, getString(R.string.history_title), getString(R.string.history_subtitle))
-
-        val filters = card(parent)
-        addLabel(filters, getString(R.string.retention_period))
-        addText(filters, getString(R.string.three_months), 18f, R.color.ink, medium = true)
-        addLabel(filters, getString(R.string.filters))
-        addLabel(filters, getString(R.string.date_range_filter))
-        addAction(
-            filters,
-            getString(R.string.date_from, formatDate(historyStartMillis)),
-            primary = false
-        ) { showDatePicker(selectStartDate = true) }
-        addAction(
-            filters,
-            getString(R.string.date_to, formatDate(historyEndDateMillis)),
-            primary = false
-        ) { showDatePicker(selectStartDate = false) }
-
-        addLabel(filters, getString(R.string.source_filter))
-        val sourceGroup = RadioGroup(this).apply {
-            orientation = RadioGroup.VERTICAL
-            addSourceOption(this, null, getString(R.string.all_sources))
-            PaymentProvider.entries.forEach { provider ->
-                addSourceOption(this, provider.displayName, provider.displayName)
-            }
+        addPageHeader(
+            parent,
+            getString(R.string.last_three_months_label),
+            getString(R.string.history_title),
+            Screen.HOME,
+            R.drawable.ic_trash,
+            getString(R.string.clear_history),
+            ::confirmClearHistory
+        )
+        val now = System.currentTimeMillis()
+        val retainedStart = PaymentHistoryRules.localDayBounds(PaymentHistoryRules.retentionCutoff(now)).startInclusiveMillis
+        val retainedEnd = PaymentHistoryRules.localDayBounds(now).endExclusiveMillis
+        val allRecords = readHistory(emptyList()) {
+            historyRepository?.history(PaymentHistoryFilter(retainedStart, retainedEnd)).orEmpty()
         }
-        sourceGroup.setOnCheckedChangeListener { group, checkedId ->
-            val selected = group.findViewById<RadioButton>(checkedId)
-            historySourceApp = selected?.tag as? String
-            historyFilterError = null
-            showScreen(Screen.HISTORY)
-        }
-        filters.addView(sourceGroup, margin(bottom = 8))
+        val summary = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        summary.addView(
+            historySummaryTile(getString(R.string.history_total_received), formatAmount(allRecords.sumOf { it.amountPaise }), true),
+            LinearLayout.LayoutParams(0, -2, 2f).apply { marginEnd = dp(8) }
+        )
+        summary.addView(
+            historySummaryTile(getString(R.string.history_payment_count), allRecords.size.toString(), false),
+            LinearLayout.LayoutParams(0, -2, 1f)
+        )
+        parent.addView(summary, margin(bottom = 12))
 
-        addLabel(filters, getString(R.string.amount_filter))
-        val amountRow = LinearLayout(this).apply {
+        val filterRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
         }
-        val minimumField = amountInput(
-            getString(R.string.minimum_amount_hint),
-            minimumAmountText
-        ) { minimumAmountText = it }
-        val maximumField = amountInput(
-            getString(R.string.maximum_amount_hint),
-            maximumAmountText
-        ) { maximumAmountText = it }
-        amountRow.addView(minimumField, LinearLayout.LayoutParams(0, dp(56), 1f).apply {
-            marginEnd = dp(6)
-        })
-        amountRow.addView(maximumField, LinearLayout.LayoutParams(0, dp(56), 1f).apply {
-            marginStart = dp(6)
-        })
-        filters.addView(amountRow, margin(bottom = 8))
-
-        historyFilterError?.let { addText(filters, it, 15f, R.color.amber) }
-        addAction(filters, getString(R.string.apply_filters), primary = true) {
-            applyHistoryFilters()
-        }
-        addAction(filters, getString(R.string.reset_filters), primary = false) {
-            resetHistoryFilters()
+        val activeCount = activeHistoryFilterCount()
+        addHistoryChip(
+            filterRow,
+            getString(R.string.filters) + if (activeCount > 0) " · $activeCount" else "",
+            R.drawable.ic_filter,
+            historyFiltersExpanded || activeCount > 0
+        ) {
+            historyFiltersExpanded = !historyFiltersExpanded
             showScreen(Screen.HISTORY)
         }
-        addText(filters, getString(R.string.total_ignores_filters), 15f, R.color.muted_ink, top = 6)
+        filterRow.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
+        addHistoryChip(filterRow, getString(historyDateRangeLabel()), R.drawable.ic_clock, false) {
+            cycleHistoryDateRange()
+        }
+        parent.addView(filterRow, margin(bottom = 10))
 
+        if (historyFiltersExpanded) addHistoryFilterPanel(parent)
         val records = readHistory(emptyList()) { historyRepository?.history(currentHistoryFilter()).orEmpty() }
         if (historyStorageError) {
             val error = card(parent)
             addText(error, getString(R.string.history_storage_error), 17f, R.color.amber)
         } else if (records.isEmpty()) {
-            val empty = card(parent)
-            addLabel(empty, getString(R.string.empty_history_title))
-            addText(empty, getString(R.string.no_matching_payments), 18f, R.color.ink, medium = true)
-            addText(empty, getString(R.string.notification_not_bank_confirmation), 15f, R.color.muted_ink)
+            val active = activeHistoryFilterCount() > 0
+            addEmptyPaymentState(
+                parent,
+                getString(if (active) R.string.no_matching_title else R.string.empty_history_title),
+                getString(if (active) R.string.no_matching_payments else R.string.empty_history_body),
+                filtered = active
+            )
+            addText(parent, getString(R.string.notification_not_bank_confirmation), 14f, R.color.muted_ink)
         } else {
-            records.forEach { addPaymentRecord(parent, it) }
+            records.groupBy { PaymentHistoryRules.localDayBounds(it.receivedAtMillis).startInclusiveMillis }
+                .toList()
+                .sortedByDescending { it.first }
+                .forEach { (dayStart, dayRecords) ->
+                    val dayGroup = card(parent)
+                    val dayHeading = LinearLayout(this).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = Gravity.CENTER_VERTICAL
+                    }
+                    dayHeading.addView(makeTextView(formatDate(dayStart), 14f, R.color.muted_ink, medium = true))
+                    dayHeading.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
+                    dayHeading.addView(makeTextView(formatAmount(dayRecords.sumOf { it.amountPaise }), 14f, R.color.ink, medium = true))
+                    dayGroup.addView(dayHeading, margin(bottom = 8))
+                    dayRecords.forEachIndexed { index, record ->
+                        addPaymentRecord(dayGroup, record, compact = true)
+                        if (index < dayRecords.lastIndex) {
+                            View(this).apply { setBackgroundColor(getColor(R.color.segment_surface)) }
+                                .also { dayGroup.addView(it, LinearLayout.LayoutParams(-1, dp(1)).apply {
+                                    marginStart = dp(10)
+                                    marginEnd = dp(10)
+                                }) }
+                        }
+                    }
+                }
         }
+        addInlineInfo(parent, getString(R.string.retention_note))
+    }
 
-        val clear = card(parent)
-        addAction(clear, getString(R.string.clear_history), primary = false) {
-            confirmClearHistory()
+    private fun addHistoryFilterPanel(parent: LinearLayout) {
+        val filters = card(parent)
+        addLabel(filters, getString(R.string.date_range_filter))
+        val dateRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        addHistoryChip(dateRow, getString(R.string.date_from, formatDate(historyStartMillis)), null, false) {
+            showDatePicker(selectStartDate = true)
         }
+        addHistoryChip(dateRow, getString(R.string.date_to, formatDate(historyEndDateMillis)), null, false) {
+            showDatePicker(selectStartDate = false)
+        }
+        filters.addView(dateRow, margin(bottom = 8))
+        addLabel(filters, getString(R.string.source_filter))
+        val sourceGroup = RadioGroup(this).apply {
+            orientation = RadioGroup.VERTICAL
+            addSourceOption(this, null, getString(R.string.all_sources))
+            PaymentProvider.entries.forEach { addSourceOption(this, it.displayName, it.displayName) }
+        }
+        sourceGroup.setOnCheckedChangeListener { group, checkedId ->
+            historySourceApp = group.findViewById<RadioButton>(checkedId)?.tag as? String
+            historyFilterError = null
+            showScreen(Screen.HISTORY)
+        }
+        filters.addView(sourceGroup, margin(bottom = 8))
+        addLabel(filters, getString(R.string.amount_filter))
+        val amountRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val minimumField = amountInput(getString(R.string.minimum_amount_hint), minimumAmountText) { minimumAmountText = it }
+        val maximumField = amountInput(getString(R.string.maximum_amount_hint), maximumAmountText) { maximumAmountText = it }
+        amountRow.addView(minimumField, LinearLayout.LayoutParams(0, dp(56), 1f).apply { marginEnd = dp(6) })
+        amountRow.addView(maximumField, LinearLayout.LayoutParams(0, dp(56), 1f).apply { marginStart = dp(6) })
+        filters.addView(amountRow, margin(bottom = 8))
+        historyFilterError?.let { addText(filters, it, 15f, R.color.amber) }
+        addAction(filters, getString(R.string.apply_filters), primary = true) { applyHistoryFilters() }
+        addAction(filters, getString(R.string.reset_filters), primary = false) {
+            resetHistoryFilters()
+            showScreen(Screen.HISTORY)
+        }
+        addText(filters, getString(R.string.total_ignores_filters), 14f, R.color.muted_ink, top = 6)
+    }
+
+    private fun historySummaryTile(label: String, value: String, primary: Boolean): LinearLayout {
+        val tile = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = rounded(if (primary) R.color.forest_dark else R.color.history_count_surface, 18)
+            setPadding(dp(14), dp(13), dp(14), dp(13))
+        }
+        addText(tile, label, 13f, if (primary) R.color.hero_muted else R.color.muted_ink, bottom = 2)
+        addText(tile, value, 21f, if (primary) R.color.surface else R.color.ink, medium = true, bottom = 0)
+        return tile
+    }
+
+    private fun addHistoryChip(parent: LinearLayout, label: String, icon: Int?, selected: Boolean, action: () -> Unit) {
+        val button = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            background = rounded(if (selected) R.color.setting_teal_surface else R.color.surface, 12,
+                if (selected) R.color.forest else R.color.line)
+            minimumHeight = dp(42)
+            setPadding(dp(10), dp(7), dp(10), dp(7))
+            isClickable = true
+            isFocusable = true
+            contentDescription = label
+            setOnClickListener { action() }
+        }
+        if (icon != null) button.addView(iconImage(icon, if (selected) R.color.forest else R.color.muted_ink),
+            LinearLayout.LayoutParams(dp(18), dp(18)).apply { marginEnd = dp(6) })
+        val text = TextView(this).apply {
+            this.text = label
+            textSize = 14f
+            setTextColor(getColor(if (selected) R.color.forest_dark else R.color.muted_ink))
+        }
+        button.addView(text)
+        parent.addView(button, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(7) })
+    }
+
+    private fun activeHistoryFilterCount(): Int {
+        val now = System.currentTimeMillis()
+        val defaultStart = PaymentHistoryRules.localDayBounds(PaymentHistoryRules.retentionCutoff(now)).startInclusiveMillis
+        val defaultEnd = PaymentHistoryRules.localDayBounds(now).startInclusiveMillis
+        return (if (historySourceApp != null) 1 else 0) +
+            (if (minimumAmountPaise != null || maximumAmountPaise != null) 1 else 0) +
+            (if (historyStartMillis > defaultStart || historyEndDateMillis < defaultEnd) 1 else 0)
+    }
+
+    private fun historyDateRangeLabel(): Int {
+        val now = System.currentTimeMillis()
+        val today = PaymentHistoryRules.localDayBounds(now).startInclusiveMillis
+        val allStart = PaymentHistoryRules.localDayBounds(PaymentHistoryRules.retentionCutoff(now)).startInclusiveMillis
+        val weekCalendar = Calendar.getInstance().apply {
+            timeInMillis = today
+            add(Calendar.DAY_OF_YEAR, -6)
+        }
+        val weekStart = PaymentHistoryRules.localDayBounds(weekCalendar.timeInMillis).startInclusiveMillis
+        return when {
+            historyStartMillis == today && historyEndDateMillis == today -> R.string.today_only
+            historyStartMillis == weekStart && historyEndDateMillis == today -> R.string.last_seven_days
+            historyStartMillis == allStart && historyEndDateMillis == today -> R.string.three_months
+            else -> R.string.custom_date_range
+        }
+    }
+
+    private fun cycleHistoryDateRange() {
+        val now = System.currentTimeMillis()
+        val today = PaymentHistoryRules.localDayBounds(now).startInclusiveMillis
+        val allStart = PaymentHistoryRules.localDayBounds(PaymentHistoryRules.retentionCutoff(now)).startInclusiveMillis
+        val weekCalendar = Calendar.getInstance().apply {
+            timeInMillis = today
+            add(Calendar.DAY_OF_YEAR, -6)
+        }
+        val weekStart = PaymentHistoryRules.localDayBounds(weekCalendar.timeInMillis).startInclusiveMillis
+        when (historyDateRangeLabel()) {
+            R.string.three_months -> {
+                historyStartMillis = today
+                historyEndDateMillis = today
+            }
+            R.string.today_only -> {
+                historyStartMillis = weekStart
+                historyEndDateMillis = today
+            }
+            else -> {
+                historyStartMillis = allStart
+                historyEndDateMillis = today
+            }
+        }
+        showScreen(Screen.HISTORY)
     }
 
     private fun addSourceOption(group: RadioGroup, sourceApp: String?, label: String) {
@@ -527,11 +1060,68 @@ class MainActivity : Activity() {
             })
         }
 
-    private fun addPaymentRecord(parent: LinearLayout, record: PaymentRecord) {
-        val item = card(parent)
-        addText(item, formatAmount(record.amountPaise), 24f, R.color.ink, medium = true)
-        addText(item, getString(R.string.last_payment_source, record.sourceApp), 16f, R.color.forest)
-        addText(item, getString(R.string.received_at, formatDateTime(record.receivedAtMillis)), 15f, R.color.muted_ink)
+    private fun addPaymentRecord(
+        parent: LinearLayout,
+        record: PaymentRecord,
+        compact: Boolean = false,
+        listRow: Boolean = false
+    ) {
+        val item = if (compact) parent else card(parent)
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            when {
+                listRow -> {
+                    setPadding(dp(12), dp(9), dp(12), dp(9))
+                    minimumHeight = dp(68)
+                }
+                !compact -> setPadding(0, dp(2), 0, dp(2))
+            }
+        }
+        val providerInitial = when (record.sourceApp) {
+            "Google Pay" -> "G"
+            "PhonePe" -> "पे"
+            else -> "P"
+        }
+        val providerColor = when (record.sourceApp) {
+            "Google Pay" -> R.color.source_google
+            "PhonePe" -> R.color.source_phonepe
+            else -> R.color.source_paytm
+        }
+        val providerSurface = when (record.sourceApp) {
+            "Google Pay" -> R.color.source_google_surface
+            "PhonePe" -> R.color.source_phonepe_surface
+            else -> R.color.source_paytm_surface
+        }
+        val receivedMark = TextView(this).apply {
+            text = providerInitial
+            textSize = if (record.sourceApp == "PhonePe") 17f else 20f
+            gravity = Gravity.CENTER
+            setTextColor(getColor(providerColor))
+            background = rounded(providerSurface, 13)
+            contentDescription = getString(R.string.source_app_accessibility, record.sourceApp)
+        }
+        row.addView(receivedMark, LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginEnd = dp(12) })
+        val details = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        addText(details, record.sourceApp, 16f, R.color.ink, medium = true, bottom = 2)
+        addText(details, getString(R.string.received_at, formatDateTime(record.receivedAtMillis)), 14f, R.color.muted_ink, bottom = 0)
+        row.addView(details, LinearLayout.LayoutParams(0, -2, 1f))
+        val amountColumn = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.END
+        }
+        val amount = TextView(this).apply {
+            text = "+${formatAmount(record.amountPaise)}"
+            textSize = if (compact) 20f else 19f
+            setTextColor(getColor(R.color.forest_dark))
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            gravity = Gravity.END
+            contentDescription = getString(R.string.received_amount_accessibility, formatAmount(record.amountPaise))
+        }
+        amountColumn.addView(amount)
+        amountColumn.addView(makeTextView(getString(R.string.received_label), 12f, R.color.muted_ink))
+        row.addView(amountColumn)
+        item.addView(row)
     }
 
     private fun currentHistoryFilter(): PaymentHistoryFilter = PaymentHistoryFilter(
@@ -555,6 +1145,7 @@ class MainActivity : Activity() {
         minimumAmountPaise = minimum
         maximumAmountPaise = maximum
         historyFilterError = null
+        historyFiltersExpanded = false
         showScreen(Screen.HISTORY)
     }
 
@@ -644,19 +1235,39 @@ class MainActivity : Activity() {
         fallback
     }
 
-    private fun addTitle(parent: LinearLayout, title: String, subtitle: String) {
-        addText(parent, title, 27f, R.color.ink, medium = true, top = 4, bottom = 2)
-        addText(parent, subtitle, 16f, R.color.muted_ink, bottom = 18)
-    }
-
     private fun card(parent: LinearLayout): LinearLayout {
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            background = rounded(R.color.surface, 20, R.color.line)
-            setPadding(dp(18), dp(17), dp(18), dp(17))
+            background = rounded(R.color.surface, 22, R.color.line)
+            setPadding(dp(18), dp(18), dp(18), dp(18))
         }
         parent.addView(container, margin(bottom = 14))
         return container
+    }
+
+    private fun addEmptyPaymentState(
+        parent: LinearLayout,
+        title: String,
+        body: String,
+        compact: Boolean = false,
+        filtered: Boolean = false
+    ) {
+        val state = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            if (compact) background = rounded(R.color.surface, 20, R.color.line)
+            setPadding(dp(18), dp(if (compact) 20 else 22), dp(18), dp(20))
+        }
+        val iconTile = LinearLayout(this).apply {
+            gravity = Gravity.CENTER
+            background = rounded(R.color.mint, 20)
+        }
+        val icon = if (filtered) R.drawable.ic_filter else R.drawable.ic_nav_history
+        iconTile.addView(iconImage(icon, R.color.forest), LinearLayout.LayoutParams(dp(30), dp(30)))
+        state.addView(iconTile, LinearLayout.LayoutParams(dp(58), dp(58)).apply { bottomMargin = dp(14) })
+        addText(state, title, 17f, R.color.ink, medium = true, bottom = 4)
+        addText(state, body, 14f, R.color.muted_ink, bottom = 0)
+        parent.addView(state, margin(top = if (compact) 0 else 18, bottom = 10))
     }
 
     private fun addLabel(parent: LinearLayout, label: String) {
@@ -672,7 +1283,12 @@ class MainActivity : Activity() {
         top: Int = 0,
         bottom: Int = 8
     ) {
-        val text = TextView(this).apply {
+        val text = makeTextView(value, size, color, medium)
+        parent.addView(text, margin(top = top, bottom = bottom))
+    }
+
+    private fun makeTextView(value: String, size: Float, color: Int, medium: Boolean = false): TextView =
+        TextView(this).apply {
             this.text = value
             textSize = size
             setTextColor(getColor(color))
@@ -680,8 +1296,6 @@ class MainActivity : Activity() {
             includeFontPadding = true
             setLineSpacing(dp(2).toFloat(), 1f)
         }
-        parent.addView(text, margin(top = top, bottom = bottom))
-    }
 
     private fun addAction(
         parent: LinearLayout,
@@ -704,54 +1318,6 @@ class MainActivity : Activity() {
             setOnClickListener { action() }
         }
         parent.addView(button, margin(top = 4))
-    }
-
-    private fun createNavigation(selected: Screen): LinearLayout {
-        val navigation = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-            setBackgroundColor(getColor(R.color.surface))
-            setPadding(dp(8), dp(7), dp(8), dp(7))
-            elevation = dp(8).toFloat()
-        }
-        val options = listOf(
-            Screen.HOME to getString(R.string.nav_home),
-            Screen.SETUP to getString(R.string.nav_setup),
-            Screen.HISTORY to getString(R.string.nav_history)
-        )
-        options.forEach { (screen, label) ->
-            val button = Button(this).apply {
-                text = label
-                textSize = 15f
-                isAllCaps = false
-                minHeight = dp(50)
-                setTextColor(getColor(if (selected == screen) R.color.surface else R.color.ink))
-                background = rounded(
-                    if (selected == screen) R.color.forest else R.color.surface,
-                    14
-                )
-                contentDescription = if (selected == screen) {
-                    getString(R.string.selected_format, label)
-                } else {
-                    label
-                }
-                setOnClickListener { showScreen(screen) }
-            }
-            navigation.addView(button, LinearLayout.LayoutParams(0, -2, 1f).apply {
-                marginStart = dp(4)
-                marginEnd = dp(4)
-            })
-        }
-        return navigation
-    }
-
-    private fun toggleLanguage() {
-        val nextLanguage = if (getUiLanguage() == AppPreferences.HINDI_LANGUAGE) {
-            AppPreferences.ENGLISH_LANGUAGE
-        } else {
-            AppPreferences.HINDI_LANGUAGE
-        }
-        setUiLanguage(nextLanguage)
     }
 
     private fun getUiLanguage(): String = AppPreferences.uiLanguage(this)
@@ -826,11 +1392,17 @@ class MainActivity : Activity() {
             if (strokeColor != null) setStroke(dp(1), getColor(strokeColor))
         }
 
-    private fun margin(top: Int = 0, bottom: Int = 0): LinearLayout.LayoutParams =
+    private fun margin(top: Int = 0, bottom: Int = 0, start: Int = 0, end: Int = 0): LinearLayout.LayoutParams =
         LinearLayout.LayoutParams(-1, -2).apply {
             topMargin = dp(top)
             bottomMargin = dp(bottom)
+            marginStart = dp(start)
+            marginEnd = dp(end)
         }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+
+    private companion object {
+        const val STATE_SCREEN = "current_screen"
+    }
 }

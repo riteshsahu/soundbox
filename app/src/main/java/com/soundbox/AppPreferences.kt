@@ -12,7 +12,7 @@ object AppPreferences {
 
     fun uiLanguage(context: Context): String = context
         .getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
-        .getString(UI_LANGUAGE, HINDI_LANGUAGE) ?: HINDI_LANGUAGE
+        .getString(UI_LANGUAGE, ENGLISH_LANGUAGE) ?: ENGLISH_LANGUAGE
 
     fun setUiLanguage(context: Context, language: String) {
         context.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
@@ -42,4 +42,5 @@ object AppPreferences {
             .putBoolean(LOUDNESS_BOOST_ENABLED, enabled)
             .apply()
     }
+
 }

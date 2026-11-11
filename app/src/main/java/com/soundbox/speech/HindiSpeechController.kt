@@ -247,6 +247,6 @@ class HindiSpeechController(
 
     private companion object {
         const val MAX_PENDING_UTTERANCES = 5
-        const val MAX_GAIN_MILLIBELS = 600
+        const val MAX_GAIN_MILLIBELS = 1200
     }
 }
