@@ -86,6 +86,23 @@ class PaymentNotificationParserTest {
     }
 
     @Test
+    fun parsesEnglishKeywordsAndCurrencyMarkersCaseInsensitively() {
+        val parsed = PaymentNotificationParser.parse(
+            PaymentProvider.GOOGLE_PAY.packageName,
+            "PAYMENT RECEIVED",
+            "INR 1,250.50 HAS BEEN CREDITED TO YOUR ACCOUNT"
+        )
+        assertEquals(125_050L, parsed?.amountPaise)
+
+        val mixedCase = PaymentNotificationParser.parse(
+            PaymentProvider.PHONEPE.packageName,
+            "Payment Update",
+            "Rs. 500 ReCeIvEd"
+        )
+        assertEquals(50_000L, mixedCase?.amountPaise)
+    }
+
+    @Test
     fun rejectsOutgoingPaymentAndBareReferenceNumbers() {
         assertRejected("₹500 paid to merchant")
         assertRejected("₹500 sent to another account")
