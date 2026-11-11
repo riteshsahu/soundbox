@@ -43,6 +43,46 @@ class PaymentNotificationParserTest {
     }
 
     @Test
+    fun acceptsAmountBeforeCurrencyWithIndianGrouping() {
+        val parsed = PaymentNotificationParser.parse(
+            PaymentProvider.PHONEPE.packageName,
+            "Payment update",
+            "1,25,000.50 Rs received from customer"
+        )
+
+        assertEquals(12_500_050L, parsed?.amountPaise)
+    }
+
+    @Test
+    fun acceptsLeadingDecimalWhenCurrencyIsSuffixed() {
+        val parsed = PaymentNotificationParser.parse(
+            PaymentProvider.PAYTM.packageName,
+            "Money received",
+            ".50 INR received"
+        )
+
+        assertEquals(50L, parsed?.amountPaise)
+    }
+
+    @Test
+    fun acceptsUnambiguousIncomingPaymentPhrasing() {
+        assertParsedAmount("₹500 paid to you")
+        assertParsedAmount("₹500 sent you")
+        assertParsedAmount("INR 500 transferred from payer")
+        assertParsedAmount("Rs 500 money received")
+    }
+
+    @Test
+    fun rejectsOutgoingPaymentAndBareReferenceNumbers() {
+        assertRejected("₹500 paid to merchant")
+        assertRejected("₹500 sent to another account")
+        assertRejected("Ref 500 received")
+    }
+
+    @Test
+    fun rejectsMalformedCommaGrouping() = assertRejected("₹12,34.50 received")
+
+    @Test
     fun rejectsDebit() = assertRejected("₹500 debited from your account")
 
     @Test
@@ -106,5 +146,14 @@ class PaymentNotificationParserTest {
                 text
             )
         )
+    }
+
+    private fun assertParsedAmount(text: String) {
+        val parsed = PaymentNotificationParser.parse(
+            PaymentProvider.GOOGLE_PAY.packageName,
+            "Payment update",
+            text
+        )
+        assertEquals(50_000L, parsed?.amountPaise)
     }
 }
