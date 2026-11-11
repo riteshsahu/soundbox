@@ -1,5 +1,7 @@
 package com.soundbox.speech
 
+import com.soundbox.notifications.PaymentProvider
+
 object HindiPaymentPhrase {
     private val words = arrayOf(
         "शून्य", "एक", "दो", "तीन", "चार", "पाँच", "छह", "सात", "आठ", "नौ",
@@ -14,7 +16,7 @@ object HindiPaymentPhrase {
         "नब्बे", "इक्यानवे", "बानवे", "तिरानवे", "चौरानवे", "पचानवे", "छियानवे", "सत्तानवे", "अट्ठानवे", "निन्यानवे"
     )
 
-    fun received(amountPaise: Long): String? {
+    fun received(amountPaise: Long, provider: PaymentProvider): String? {
         if (amountPaise <= 0L) return null
         val rupees = amountPaise / 100
         val paise = (amountPaise % 100).toInt()
@@ -29,7 +31,12 @@ object HindiPaymentPhrase {
                 append(" पैसे")
             }
         }
-        return "$amount प्राप्त हुए"
+        val appName = when (provider) {
+            PaymentProvider.GOOGLE_PAY -> "गूगल पे"
+            PaymentProvider.PHONEPE -> "फोनपे"
+            PaymentProvider.PAYTM -> "पेटीएम"
+        }
+        return "$appName पर $amount प्राप्त हुए"
     }
 
     private fun numberToWords(value: Long): String {

@@ -101,7 +101,7 @@ class PaymentNotificationListener : NotificationListenerService() {
         sendBroadcast(Intent(HistoryActions.PAYMENTS_CHANGED).setPackage(packageName))
         if (!AppPreferences.announcementsEnabled(this)) return
 
-        val phrase = HindiPaymentPhrase.received(payment.amountPaise) ?: return
+        val phrase = HindiPaymentPhrase.received(payment.amountPaise, payment.source) ?: return
         speechController.speakHindi(phrase)
     }
 
