@@ -71,6 +71,7 @@
     <string name="listening_active">Listening is on</string>
     <string name="listening_needs_setup">Setup is not complete</string>
     <string name="ready_voice_and_access">Notification access and Hindi voice are ready</string>
+    <string name="home_voice_missing">Hindi voice unavailable · open Settings</string>
     <string name="notification_access_scope">Android may make notifications from other apps visible to this service. SoundBox skips non-allowlisted packages before reading their content.</string>
     <string name="allowlist_privacy">Only notifications from the selected Google Pay, PhonePe, and Paytm package IDs are checked.</string>
     <string name="local_only_no_notification_text">Only amount, received time, and source app are kept on this phone. Original notification text is never saved or logged.</string>

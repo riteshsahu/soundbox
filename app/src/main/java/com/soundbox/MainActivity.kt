@@ -260,7 +260,8 @@ class MainActivity : Activity() {
         val notificationAccessEnabled = NotificationAccess.isEnabled(this)
         if (!notificationAccessEnabled) addNotificationAccessCard(parent)
         val announcementsEnabled = AppPreferences.announcementsEnabled(this)
-        val announcementReady = notificationAccessEnabled && announcementsEnabled
+        val announcementReady = notificationAccessEnabled && announcementsEnabled &&
+            ttsCheckComplete && hindiVoiceReady
 
         val total = FrameLayout(this).apply {
             background = rounded(if (announcementReady) R.color.forest_dark else R.color.paused_hero, 27)
@@ -299,8 +300,10 @@ class MainActivity : Activity() {
             text = getString(
                 when {
                     !notificationAccessEnabled -> R.string.listening_needs_setup
-                    announcementsEnabled -> R.string.announcements_enabled
-                    else -> R.string.announcements_disabled
+                    !announcementsEnabled -> R.string.announcements_disabled
+                    !ttsCheckComplete -> R.string.voice_checking
+                    !hindiVoiceReady -> R.string.home_voice_missing
+                    else -> R.string.announcements_enabled
                 }
             )
             textSize = 14f

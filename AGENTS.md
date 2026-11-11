@@ -2,11 +2,11 @@
 
 ## Project Structure
 
-This repository currently contains `PROJECT_BRIEF.md`, the product and privacy requirements for SoundBox. There is no application source, build configuration, or test tree yet. When the Android app is added, keep it a small native Kotlin project: place production code under `app/src/main/`, resources under `app/src/main/res/`, and tests under `app/src/test/`. Separate notification listening, conservative payment parsing, speech/audio, local storage, and UI responsibilities. Keep the provider package allowlist in one clearly named location.
+This repository contains the SoundBox product requirements and a small native Kotlin Android app. Keep production code under `app/src/main/`, resources under `app/src/main/res/`, local unit tests under `app/src/test/`, and Android instrumentation tests under `app/src/androidTest/`. Separate notification listening, conservative payment parsing, speech/audio, local storage, and UI responsibilities. Keep the provider package allowlist in one clearly named location.
 
 ## Build, Test, and Development
 
-No build or test commands are configured yet. Once the Gradle Android project exists, use the checked-in Gradle wrapper rather than a separately installed Gradle:
+Use the checked-in Gradle wrapper rather than a separately installed Gradle:
 
 - `./gradlew assembleDebug` builds a debug APK.
 - `./gradlew test` runs local unit tests.

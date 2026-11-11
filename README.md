@@ -4,7 +4,7 @@ SoundBox is a small, native Android app for announcing confidently identified in
 
 ## Milestones
 
-**Milestone 1 — Foundation:** The runnable Kotlin app shell has Home, Setup, and Payment History screens. The visible UI can be switched between Hindi and English, with Hindi as the default; the choice is saved locally.
+**Milestone 1 — Foundation:** The runnable Kotlin app shell has Home, Setup, and Payment History screens. The visible UI can be switched between Hindi and English, with English as the default; the choice is saved locally.
 
 **Milestone 2 — Speech and listener:** The app checks OS notification-listener access, requires an installed offline Hindi TTS voice, offers Hindi test speech, and listens only to exact Google Pay, PhonePe, and Paytm package IDs. Announcements are off until explicitly enabled. The parser is deliberately conservative and uses synthetic tests. Speech stays Hindi regardless of UI language.
 

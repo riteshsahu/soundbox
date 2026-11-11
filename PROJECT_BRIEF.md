@@ -6,7 +6,7 @@
 
 Build **SoundBox**, a polished, trustworthy Android app for my father’s phone. When a successful incoming payment notification arrives from Google Pay, PhonePe, or Paytm, announce the received amount aloud in Hindi. Also keep a locally stored history of received payments for the last three months and show today’s collection.
 
-This is for personal/family use. Prioritize clear behavior, a carefully designed, accessible UI, low permissions, and code that is easy to inspect. Keep all app data on the device. Payment announcements must be in Hindi only. Let the visible app UI switch between Hindi and English, with Hindi as the default; do not offer other UI languages or add unrelated features. Do not add features beyond this brief without asking.
+This is for personal/family use. Prioritize clear behavior, a carefully designed, accessible UI, low permissions, and code that is easy to inspect. Keep all app data on the device. Payment announcements must be in Hindi only. Let the visible app UI switch between Hindi and English, with English as the default; do not offer other UI languages or add unrelated features. Do not add features beyond this brief without asking.
 
 ### First: inspect and plan
 
@@ -51,7 +51,7 @@ This is for personal/family use. Prioritize clear behavior, a carefully designed
 
 ### UI/UX direction
 
-- Design the UI deliberately for an older adult: simple navigation, large readable text, strong contrast, generous touch targets, a clear Hindi/English language choice (Hindi by default), and no dense dashboards. Changing the UI language must not change the Hindi-only payment announcement voice.
+- Design the UI deliberately for an older adult: simple navigation, large readable text, strong contrast, generous touch targets, a clear Hindi/English language choice (English by default), and no dense dashboards. Changing the UI language must not change the Hindi-only payment announcement voice.
 - Make the home screen answer three things quickly: Is listening enabled? What is today’s collection? What was the latest received payment?
 - Give the main actions clear visual priority: enable/setup listening, test speech, and view history. Avoid clutter, decorative charts, tiny icons without labels, and hidden gestures.
 - Use a calm, high-contrast visual system and consistent spacing. Support larger system font/display settings and screen readers. Do not rely on color alone for status.

@@ -71,6 +71,7 @@
     <string name="listening_active">सुनना चालू है</string>
     <string name="listening_needs_setup">सेटअप पूरा करना बाकी है</string>
     <string name="ready_voice_and_access">सूचना ऐक्सेस और हिंदी आवाज़ तैयार</string>
+    <string name="home_voice_missing">हिंदी आवाज़ उपलब्ध नहीं · सेटिंग देखें</string>
     <string name="notification_access_scope">Android इस अनुमति से अन्य ऐप की सूचनाएँ भी उपलब्ध करा सकता है। SoundBox सामग्री पढ़ने से पहले गैर-अनुमत पैकेज को छोड़ देता है।</string>
     <string name="allowlist_privacy">केवल Google Pay, PhonePe और Paytm के लिए चुने गए पैकेज की जाँच होती है।</string>
     <string name="local_only_no_notification_text">केवल रकम, मिलने का समय और ऐप का नाम फ़ोन पर रखे जाते हैं। मूल सूचना सहेजी या लॉग नहीं होती।</string>
