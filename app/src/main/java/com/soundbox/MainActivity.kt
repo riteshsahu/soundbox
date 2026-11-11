@@ -70,6 +70,7 @@ class MainActivity : Activity() {
     private var historyFiltersExpanded = false
     private var historyStorageError = false
     private var paymentEventsReceiverRegistered = false
+    private var samplePreviewEnabled = false
 
     private val paymentEventsReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -104,7 +105,9 @@ class MainActivity : Activity() {
 
     override fun onStart() {
         super.onStart()
-        val filter = android.content.IntentFilter(HistoryActions.PAYMENTS_CHANGED)
+        val filter = android.content.IntentFilter(HistoryActions.PAYMENTS_CHANGED).apply {
+            addAction(NotificationAccess.ACTION_LISTENER_STATE_CHANGED)
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(paymentEventsReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
         } else {
@@ -256,11 +259,13 @@ class MainActivity : Activity() {
 
     private fun addHome(parent: LinearLayout) {
         addHomeHeader(parent)
+        if (samplePreviewEnabled && BuildConfig.DEBUG) addSamplePreviewNotice(parent)
 
         val notificationAccessEnabled = NotificationAccess.isEnabled(this)
+        val listenerConnected = notificationAccessEnabled && NotificationAccess.isListenerConnected()
         if (!notificationAccessEnabled) addNotificationAccessCard(parent)
         val announcementsEnabled = AppPreferences.announcementsEnabled(this)
-        val announcementReady = notificationAccessEnabled && announcementsEnabled &&
+        val announcementReady = listenerConnected && announcementsEnabled &&
             ttsCheckComplete && hindiVoiceReady
 
         val total = FrameLayout(this).apply {
@@ -300,6 +305,7 @@ class MainActivity : Activity() {
             text = getString(
                 when {
                     !notificationAccessEnabled -> R.string.listening_needs_setup
+                    !listenerConnected -> R.string.listener_connecting
                     !announcementsEnabled -> R.string.announcements_disabled
                     !ttsCheckComplete -> R.string.voice_checking
                     !hindiVoiceReady -> R.string.home_voice_missing
@@ -313,9 +319,16 @@ class MainActivity : Activity() {
         statusRow.addView(statusText)
         totalContent.addView(statusRow, margin(bottom = 20))
         addText(totalContent, getString(R.string.today_total), 15f, R.color.hero_muted, medium = true, bottom = 2)
-        val todayTotalPaise = readHistory(0L) { historyRepository?.todayTotal() ?: 0L }
-        val todayBounds = PaymentHistoryRules.localDayBounds(System.currentTimeMillis())
-        val todayPaymentCount = readHistory(0) {
+        val now = System.currentTimeMillis()
+        val todayBounds = PaymentHistoryRules.localDayBounds(now)
+        val previewRecords = if (samplePreviewEnabled && BuildConfig.DEBUG) samplePayments(now) else null
+        val todayRecords = previewRecords?.let { filterSamplePayments(
+            it,
+            PaymentHistoryFilter(todayBounds.startInclusiveMillis, todayBounds.endExclusiveMillis)
+        ) }
+        val todayTotalPaise = todayRecords?.sumOf { it.amountPaise }
+            ?: readHistory(0L) { historyRepository?.todayTotal() ?: 0L }
+        val todayPaymentCount = todayRecords?.size ?: readHistory(0) {
             historyRepository?.history(
                 PaymentHistoryFilter(todayBounds.startInclusiveMillis, todayBounds.endExclusiveMillis)
             )?.size ?: 0
@@ -332,7 +345,7 @@ class MainActivity : Activity() {
         val paymentCountText = makeTextView(getString(R.string.today_payment_count, todayPaymentCount), 14f, R.color.hero_muted)
         meta.addView(paymentCountText, LinearLayout.LayoutParams(-2, -2))
         meta.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
-        val localDateText = makeTextView(getString(R.string.today_date_label, formatDate(System.currentTimeMillis())), 13f, R.color.hero_muted)
+        val localDateText = makeTextView(getString(R.string.today_date_label, formatDate(now)), 13f, R.color.hero_muted)
         meta.addView(localDateText, LinearLayout.LayoutParams(-2, -2))
         totalContent.addView(meta)
         addSoundWave(total)
@@ -342,9 +355,12 @@ class MainActivity : Activity() {
         val retainedStart = PaymentHistoryRules.localDayBounds(
             PaymentHistoryRules.retentionCutoff(System.currentTimeMillis())
         ).startInclusiveMillis
-        val recentPayments = readHistory(emptyList()) {
+        val recentPayments = previewRecords?.let { filterSamplePayments(
+            it,
+            PaymentHistoryFilter(retainedStart, PaymentHistoryRules.localDayBounds(now).endExclusiveMillis)
+        ).take(3) } ?: readHistory(emptyList()) {
             historyRepository?.history(
-                PaymentHistoryFilter(retainedStart, PaymentHistoryRules.localDayBounds(System.currentTimeMillis()).endExclusiveMillis)
+                PaymentHistoryFilter(retainedStart, PaymentHistoryRules.localDayBounds(now).endExclusiveMillis)
             )?.take(3) ?: emptyList()
         }
         if (historyStorageError) {
@@ -449,6 +465,37 @@ class MainActivity : Activity() {
         parent.addView(button, margin(top = 10))
     }
 
+    private fun addSamplePreviewNotice(parent: LinearLayout) {
+        val notice = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = rounded(R.color.access_surface, 16, R.color.access_line)
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+        }
+        notice.addView(iconImage(R.drawable.ic_info, R.color.access_ink), LinearLayout.LayoutParams(dp(22), dp(22)).apply {
+            marginEnd = dp(9)
+        })
+        notice.addView(
+            makeTextView(getString(R.string.sample_preview_notice), 14f, R.color.ink, medium = true),
+            LinearLayout.LayoutParams(0, -2, 1f)
+        )
+        val exit = TextView(this).apply {
+            text = getString(R.string.exit_sample_preview)
+            textSize = 14f
+            setTextColor(getColor(R.color.access_ink))
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            isClickable = true
+            isFocusable = true
+            contentDescription = getString(R.string.exit_sample_preview)
+            setOnClickListener {
+                samplePreviewEnabled = false
+                showScreen(currentScreen)
+            }
+        }
+        notice.addView(exit, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(8) })
+        parent.addView(notice, margin(bottom = 13))
+    }
+
     private fun addSettings(parent: LinearLayout) {
         addPageHeader(parent, getString(R.string.settings_eyebrow), getString(R.string.settings_title), Screen.HOME)
 
@@ -501,8 +548,12 @@ class MainActivity : Activity() {
             support,
             R.drawable.ic_bell,
             getString(R.string.notification_access),
-            getString(if (NotificationAccess.isEnabled(this)) R.string.listener_ready else R.string.listener_not_ready),
-            if (NotificationAccess.isEnabled(this)) R.color.status_green else R.color.status_amber
+            getString(notificationListenerStatusString()),
+            if (notificationListenerStatusString() == R.string.listener_connected) {
+                R.color.status_green
+            } else {
+                R.color.status_amber
+            }
         ) {
             startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
         }
@@ -529,7 +580,25 @@ class MainActivity : Activity() {
             getString(R.string.privacy_data_summary),
             R.color.status_slate
         ) { showScreen(Screen.PRIVACY) }
+        if (BuildConfig.DEBUG) {
+            addSupportRow(
+                support,
+                R.drawable.ic_nav_history,
+                getString(R.string.sample_preview_setting),
+                getString(R.string.sample_preview_setting_summary),
+                R.color.status_slate
+            ) {
+                samplePreviewEnabled = true
+                showScreen(Screen.HOME)
+            }
+        }
         addText(parent, getString(R.string.app_version), 13f, R.color.muted_ink, top = 8, bottom = 20)
+    }
+
+    private fun notificationListenerStatusString(): Int = when {
+        !NotificationAccess.isEnabled(this) -> R.string.listener_not_ready
+        NotificationAccess.isListenerConnected() -> R.string.listener_connected
+        else -> R.string.listener_connecting
     }
 
     private fun addToggleSetting(parent: LinearLayout, icon: Int, title: String, subtitle: String) {
@@ -818,19 +887,30 @@ class MainActivity : Activity() {
     }
 
     private fun addHistory(parent: LinearLayout) {
-        addPageHeader(
-            parent,
-            getString(R.string.last_three_months_label),
-            getString(R.string.history_title),
-            Screen.HOME,
-            R.drawable.ic_trash,
-            getString(R.string.clear_history),
-            ::confirmClearHistory
-        )
+        if (samplePreviewEnabled && BuildConfig.DEBUG) {
+            addPageHeader(
+                parent,
+                getString(R.string.last_three_months_label),
+                getString(R.string.history_title),
+                Screen.HOME
+            )
+        } else {
+            addPageHeader(
+                parent,
+                getString(R.string.last_three_months_label),
+                getString(R.string.history_title),
+                Screen.HOME,
+                R.drawable.ic_trash,
+                getString(R.string.clear_history),
+                ::confirmClearHistory
+            )
+        }
+        if (samplePreviewEnabled && BuildConfig.DEBUG) addSamplePreviewNotice(parent)
         val now = System.currentTimeMillis()
         val retainedStart = PaymentHistoryRules.localDayBounds(PaymentHistoryRules.retentionCutoff(now)).startInclusiveMillis
         val retainedEnd = PaymentHistoryRules.localDayBounds(now).endExclusiveMillis
-        val allRecords = readHistory(emptyList()) {
+        val previewRecords = if (samplePreviewEnabled && BuildConfig.DEBUG) samplePayments(now) else null
+        val allRecords = previewRecords ?: readHistory(emptyList()) {
             historyRepository?.history(PaymentHistoryFilter(retainedStart, retainedEnd)).orEmpty()
         }
         val summary = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
@@ -865,7 +945,8 @@ class MainActivity : Activity() {
         parent.addView(filterRow, margin(bottom = 10))
 
         if (historyFiltersExpanded) addHistoryFilterPanel(parent)
-        val records = readHistory(emptyList()) { historyRepository?.history(currentHistoryFilter()).orEmpty() }
+        val records = previewRecords?.let { filterSamplePayments(it, currentHistoryFilter()) }
+            ?: readHistory(emptyList()) { historyRepository?.history(currentHistoryFilter()).orEmpty() }
         if (historyStorageError) {
             val error = card(parent)
             addText(error, getString(R.string.history_storage_error), 17f, R.color.amber)
@@ -878,6 +959,12 @@ class MainActivity : Activity() {
                 filtered = active
             )
             addText(parent, getString(R.string.notification_not_bank_confirmation), 14f, R.color.muted_ink)
+            if (BuildConfig.DEBUG && !samplePreviewEnabled) {
+                addAction(parent, getString(R.string.view_sample_payments), primary = false) {
+                    samplePreviewEnabled = true
+                    showScreen(Screen.HOME)
+                }
+            }
         } else {
             records.groupBy { PaymentHistoryRules.localDayBounds(it.receivedAtMillis).startInclusiveMillis }
                 .toList()
@@ -905,6 +992,36 @@ class MainActivity : Activity() {
                 }
         }
         addInlineInfo(parent, getString(R.string.retention_note))
+    }
+
+    private fun samplePayments(now: Long): List<PaymentRecord> {
+        fun receivedAt(daysAgo: Int, hour: Int, minute: Int): Long = Calendar.getInstance().apply {
+            timeInMillis = now
+            set(Calendar.HOUR_OF_DAY, hour)
+            set(Calendar.MINUTE, minute)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+            add(Calendar.DAY_OF_YEAR, -daysAgo)
+        }.timeInMillis
+
+        return listOf(
+            PaymentRecord(85_000L, receivedAt(0, 10, 42), "Google Pay"),
+            PaymentRecord(120_000L, receivedAt(0, 9, 16), "PhonePe"),
+            PaymentRecord(45_000L, receivedAt(0, 8, 3), "Paytm"),
+            PaymentRecord(250_000L, receivedAt(1, 18, 34), "Google Pay"),
+            PaymentRecord(18_000L, receivedAt(2, 14, 21), "PhonePe")
+        )
+    }
+
+    private fun filterSamplePayments(
+        records: List<PaymentRecord>,
+        filter: PaymentHistoryFilter
+    ): List<PaymentRecord> = records.filter { record ->
+        record.receivedAtMillis >= filter.startInclusiveMillis &&
+            record.receivedAtMillis < filter.endExclusiveMillis &&
+            (filter.sourceApp == null || record.sourceApp == filter.sourceApp) &&
+            (filter.minimumAmountPaise == null || record.amountPaise >= filter.minimumAmountPaise) &&
+            (filter.maximumAmountPaise == null || record.amountPaise <= filter.maximumAmountPaise)
     }
 
     private fun addHistoryFilterPanel(parent: LinearLayout) {

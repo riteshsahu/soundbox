@@ -6,6 +6,10 @@ android {
     namespace = "com.soundbox"
     compileSdk = 37
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     defaultConfig {
         applicationId = "com.soundbox"
         minSdk = 23

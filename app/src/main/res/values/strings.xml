@@ -48,6 +48,11 @@
     <string name="reset_filters">फ़िल्टर रीसेट करें</string>
     <string name="empty_history_title">अभी कोई रिकॉर्ड नहीं</string>
     <string name="empty_history_body">सफल प्राप्त भुगतान यहाँ दिखाई देंगे।</string>
+    <string name="view_sample_payments">नमूना भुगतान देखें</string>
+    <string name="sample_preview_notice">नमूना दृश्य। ये उदाहरण भुगतान सहेजे नहीं जाते।</string>
+    <string name="exit_sample_preview">बंद करें</string>
+    <string name="sample_preview_setting">नमूना भुगतान देखें</string>
+    <string name="sample_preview_setting_summary">अस्थायी उदाहरण; सहेजे नहीं जाते</string>
     <string name="notification_not_bank_confirmation">भुगतान सूचना बैंक से पुष्टि नहीं होती।</string>
     <string name="clear_history">इतिहास मिटाएँ</string>
     <string name="nav_home">गृह</string>
@@ -56,6 +61,8 @@
     <string name="selected_format">चयनित: %1$s</string>
     <string name="listener_ready">सूचना ऐक्सेस चालू</string>
     <string name="listener_not_ready">सूचना ऐक्सेस चालू नहीं है</string>
+    <string name="listener_connected">कनेक्ट है और सुन रहा है</string>
+    <string name="listener_connecting">ऐक्सेस चालू है; सेवा कनेक्ट नहीं है</string>
     <string name="announcement_setting">भुगतान की आवाज़</string>
     <string name="announcements_enabled">भुगतान की आवाज़ चालू</string>
     <string name="announcements_disabled">भुगतान की आवाज़ बंद</string>

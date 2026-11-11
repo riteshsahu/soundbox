@@ -48,6 +48,11 @@
     <string name="reset_filters">Reset filters</string>
     <string name="empty_history_title">No records yet</string>
     <string name="empty_history_body">Successful received payments will appear here.</string>
+    <string name="view_sample_payments">Preview sample payments</string>
+    <string name="sample_preview_notice">Sample preview. These example payments are not saved.</string>
+    <string name="exit_sample_preview">Exit</string>
+    <string name="sample_preview_setting">Preview sample payments</string>
+    <string name="sample_preview_setting_summary">Temporary examples; not saved</string>
     <string name="notification_not_bank_confirmation">A payment notification is not bank confirmation.</string>
     <string name="clear_history">Clear history</string>
     <string name="nav_home">Home</string>
@@ -56,6 +61,8 @@
     <string name="selected_format">%1$s, selected</string>
     <string name="listener_ready">Notification access is on</string>
     <string name="listener_not_ready">Notification access is off</string>
+    <string name="listener_connected">Connected and listening</string>
+    <string name="listener_connecting">Access is on; listener is not connected</string>
     <string name="announcement_setting">Payment announcements</string>
     <string name="announcements_enabled">Payment announcements are on</string>
     <string name="announcements_disabled">Payment announcements are off</string>

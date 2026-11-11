@@ -46,6 +46,7 @@ class PaymentNotificationListener : NotificationListenerService() {
 
     override fun onCreate() {
         super.onCreate()
+        NotificationAccess.setListenerConnected(this, false)
         val filter = IntentFilter(SpeechActions.REFRESH_LOCAL_HINDI_VOICE)
             .apply {
                 addAction(SpeechActions.STOP_QUEUED_ANNOUNCEMENTS)
@@ -63,6 +64,16 @@ class PaymentNotificationListener : NotificationListenerService() {
             initialBoostEnabled = AppPreferences.loudnessBoostEnabled(applicationContext)
         )
         historyRepository = PaymentHistoryRepository(applicationContext)
+    }
+
+    override fun onListenerConnected() {
+        super.onListenerConnected()
+        NotificationAccess.setListenerConnected(this, true)
+    }
+
+    override fun onListenerDisconnected() {
+        super.onListenerDisconnected()
+        NotificationAccess.setListenerConnected(this, false)
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
@@ -96,6 +107,7 @@ class PaymentNotificationListener : NotificationListenerService() {
     }
 
     override fun onDestroy() {
+        NotificationAccess.setListenerConnected(this, false)
         unregisterReceiver(refreshVoiceReceiver)
         if (::speechController.isInitialized) speechController.shutdown()
         if (::historyRepository.isInitialized) historyRepository.close()
