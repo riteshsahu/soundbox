@@ -49,18 +49,19 @@ class PaymentHistoryRepositoryTest {
     fun testHistoryReadPrunesRowsOlderThanThreeMonths() {
         val now = System.currentTimeMillis()
         val cutoff = PaymentHistoryRules.retentionCutoff(now)
+        val retainedTimestamp = cutoff + 60_000L
         repository.latestPayment() // Create the schema before inserting controlled test rows.
         val database = appContext.openOrCreateDatabase(DATABASE_NAME, 0, null)
         try {
             insert(database, 10_000L, cutoff - 1L, "Paytm")
-            insert(database, 20_000L, cutoff + 1L, "PhonePe")
+            insert(database, 20_000L, retainedTimestamp, "PhonePe")
         } finally {
             database.close()
         }
 
         val retained = repository.history(PaymentHistoryFilter(cutoff - 1_000L, now + 1_000L))
 
-        assertEquals(listOf(PaymentRecord(20_000L, cutoff + 1L, "PhonePe")), retained)
+        assertEquals(listOf(PaymentRecord(20_000L, retainedTimestamp, "PhonePe")), retained)
     }
 
     @Test
