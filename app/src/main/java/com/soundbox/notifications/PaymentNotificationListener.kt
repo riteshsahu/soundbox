@@ -25,19 +25,18 @@ class PaymentNotificationListener : NotificationListenerService() {
             when (intent.action) {
                 SpeechActions.STOP_QUEUED_ANNOUNCEMENTS -> speechController.stopAll()
                 SpeechActions.SET_LOUDNESS_BOOST -> {
-                    speechController.setBoostEnabled(
-                        intent.getBooleanExtra(
-                            SpeechActions.EXTRA_BOOST_ENABLED,
-                            AppPreferences.loudnessBoostEnabled(applicationContext)
-                        )
-                    )
+                    speechController.setBoostDb(intent.getIntExtra(
+                        SpeechActions.EXTRA_BOOST_DB,
+                        AppPreferences.loudnessBoostDb(applicationContext)
+                    ))
                 }
                 SpeechActions.REFRESH_LOCAL_HINDI_VOICE -> {
                     speechController.shutdown()
                     speechController = HindiSpeechController(
                         context = applicationContext,
                         onReadinessChanged = {},
-                        initialBoostEnabled = AppPreferences.loudnessBoostEnabled(applicationContext)
+                        initialBoostEnabled = AppPreferences.loudnessBoostDb(applicationContext) > 0,
+                        initialBoostDb = AppPreferences.loudnessBoostDb(applicationContext)
                     )
                 }
             }

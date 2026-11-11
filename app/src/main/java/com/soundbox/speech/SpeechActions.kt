@@ -5,4 +5,5 @@ object SpeechActions {
     const val STOP_QUEUED_ANNOUNCEMENTS = "com.soundbox.action.STOP_QUEUED_ANNOUNCEMENTS"
     const val SET_LOUDNESS_BOOST = "com.soundbox.action.SET_LOUDNESS_BOOST"
     const val EXTRA_BOOST_ENABLED = "boost_enabled"
+    const val EXTRA_BOOST_DB = "boost_db"
 }

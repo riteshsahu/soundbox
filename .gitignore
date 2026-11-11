@@ -3,4 +3,7 @@
 /build/
 /app/build/
 /local.properties
+/release-signing.properties
 *.iml
+*.jks
+*.keystore

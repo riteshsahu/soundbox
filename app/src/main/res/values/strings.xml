@@ -106,7 +106,7 @@
     <string name="normal_sound">सामान्य आवाज़</string>
     <string name="normal_sound_description">फ़ोन का मौजूदा मीडिया वॉल्यूम इस्तेमाल करें</string>
     <string name="boosted_sound">बढ़ी हुई आवाज़</string>
-    <string name="boosted_sound_description">डिवाइस समर्थित होने पर अधिकतम +12 dB</string>
+    <string name="boosted_sound_description">आवाज़ 0 से +48 dB तक समायोजित करें</string>
     <string name="boost_effect_normal">सामान्य आवाज़ चुनी गई है।</string>
     <string name="boost_effect_available">इस डिवाइस पर आवाज़ बढ़ाना उपलब्ध है।</string>
     <string name="boost_effect_unavailable">यह डिवाइस आवाज़ बढ़ाने की सुविधा नहीं दे रहा; सामान्य आवाज़ जारी रहेगी।</string>
@@ -169,4 +169,6 @@
     <string name="today_only">आज</string>
     <string name="last_seven_days">पिछले 7 दिन</string>
     <string name="custom_date_range">तारीख़ सीमा</string>
+    <string name="speech_boost_level">आवाज़ बढ़ाएँ</string>
+    <string name="speech_boost_range">0 dB से +48 dB तक, 6 dB के चरणों में</string>
 </resources>

@@ -18,6 +18,7 @@ class HindiSpeechController(
     private val onReadinessChanged: (Boolean) -> Unit,
     private val onBoostAvailabilityChanged: (Boolean?) -> Unit = {},
     initialBoostEnabled: Boolean = false
+    , initialBoostDb: Int = 12
 ) {
     private val appContext = context.applicationContext
     private val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -29,7 +30,7 @@ class HindiSpeechController(
     private val pending = ArrayDeque<String>()
     private var textToSpeech: TextToSpeech? = null
     private var loudnessEnhancer: LoudnessEnhancer? = null
-    private var boostEnabled = initialBoostEnabled
+    private var boostGainDb = if (initialBoostEnabled) initialBoostDb.coerceIn(6, 48) else 0
     private var focusRequest: AudioFocusRequest? = null
     private var focusHeld = false
     private var waitingForFocus = false
@@ -89,11 +90,11 @@ class HindiSpeechController(
                         override fun onError(utteranceId: String?, errorCode: Int) = finishUtterance()
                     })
                     isReady = true
-                    if (boostEnabled) applyBoost()
+                    if (boostGainDb > 0) applyBoost()
                 }
             }
             onReadinessChanged(isReady)
-            if (!isReady && boostEnabled) setBoostAvailability(false)
+            if (!isReady && boostGainDb > 0) setBoostAvailability(false)
             if (isReady) drainQueue() else pending.clear()
         }
     }
@@ -113,9 +114,9 @@ class HindiSpeechController(
         abandonFocus()
     }
 
-    fun setBoostEnabled(enabled: Boolean): Boolean? {
-        boostEnabled = enabled
-        if (!enabled) {
+    fun setBoostDb(db: Int): Boolean? {
+        boostGainDb = (db.coerceIn(0, 48) / 6) * 6
+        if (boostGainDb == 0) {
             releaseLoudnessEnhancer()
             return isBoostAvailable
         }
@@ -151,7 +152,7 @@ class HindiSpeechController(
         while (pending.isNotEmpty()) {
             val phrase = pending.removeFirst()
             val utteranceId = "soundbox-${nextUtteranceId++}"
-            if (boostEnabled) applyBoost()
+            if (boostGainDb > 0) applyBoost()
             val parameters = Bundle().apply {
                 if (audioSessionId > 0) {
                     putInt(TextToSpeech.Engine.KEY_PARAM_SESSION_ID, audioSessionId)
@@ -203,7 +204,7 @@ class HindiSpeechController(
                 effect = LoudnessEnhancer(audioSessionId)
                 if (!effect.hasControl()) throw UnsupportedOperationException("Audio effect control unavailable")
             }
-            effect.setTargetGain(MAX_GAIN_MILLIBELS)
+            effect.setTargetGain(boostGainDb * 100)
             if (effect.setEnabled(true) != AudioEffect.SUCCESS) {
                 throw UnsupportedOperationException("Audio effect could not be enabled")
             }
@@ -247,6 +248,5 @@ class HindiSpeechController(
 
     private companion object {
         const val MAX_PENDING_UTTERANCES = 5
-        const val MAX_GAIN_MILLIBELS = 1200
     }
 }

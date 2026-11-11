@@ -9,6 +9,9 @@ object AppPreferences {
     const val ENGLISH_LANGUAGE = "en"
     const val ANNOUNCEMENTS_ENABLED = "announcements_enabled"
     const val LOUDNESS_BOOST_ENABLED = "loudness_boost_enabled"
+    const val LOUDNESS_BOOST_DB = "loudness_boost_db"
+    const val MAX_LOUDNESS_BOOST_DB = 48
+    const val LOUDNESS_BOOST_STEP_DB = 6
 
     fun uiLanguage(context: Context): String = context
         .getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
@@ -40,6 +43,19 @@ object AppPreferences {
         context.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(LOUDNESS_BOOST_ENABLED, enabled)
+            .apply()
+    }
+
+    fun loudnessBoostDb(context: Context): Int = context
+        .getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
+        .getInt(LOUDNESS_BOOST_DB, if (loudnessBoostEnabled(context)) 12 else 0)
+        .coerceIn(0, MAX_LOUDNESS_BOOST_DB) / LOUDNESS_BOOST_STEP_DB * LOUDNESS_BOOST_STEP_DB
+
+    fun setLoudnessBoostDb(context: Context, db: Int) {
+        val value = (db.coerceIn(0, MAX_LOUDNESS_BOOST_DB) / LOUDNESS_BOOST_STEP_DB) * LOUDNESS_BOOST_STEP_DB
+        context.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE).edit()
+            .putInt(LOUDNESS_BOOST_DB, value)
+            .putBoolean(LOUDNESS_BOOST_ENABLED, value > 0)
             .apply()
     }
 

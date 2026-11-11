@@ -106,7 +106,7 @@
     <string name="normal_sound">Normal sound</string>
     <string name="normal_sound_description">Use the phone’s current media volume</string>
     <string name="boosted_sound">Boosted sound</string>
-    <string name="boosted_sound_description">Up to +12 dB, when the device supports it</string>
+    <string name="boosted_sound_description">Adjust speech boost from 0 to +48 dB</string>
     <string name="boost_effect_normal">Normal sound is selected.</string>
     <string name="boost_effect_available">Speech boost is available on this device.</string>
     <string name="boost_effect_unavailable">This device does not provide speech boost; normal sound will continue.</string>
@@ -169,4 +169,6 @@
     <string name="today_only">Today only</string>
     <string name="last_seven_days">Last 7 days</string>
     <string name="custom_date_range">Date range</string>
+    <string name="speech_boost_level">Speech boost</string>
+    <string name="speech_boost_range">0 dB to +48 dB, in 6 dB steps</string>
 </resources>

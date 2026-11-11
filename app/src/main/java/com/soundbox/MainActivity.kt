@@ -26,6 +26,7 @@ import android.widget.ImageView
 import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.ScrollView
+import android.widget.SeekBar
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
@@ -515,7 +516,7 @@ class MainActivity : Activity() {
         val loudness = card(parent)
         addSettingHeading(loudness, R.drawable.ic_volume, R.color.boost_surface,
             getString(R.string.loudness_boost), getString(R.string.boost_short_description))
-        addLoudnessSegment(loudness)
+        addLoudnessSlider(loudness)
         addText(
             loudness,
             getString(
@@ -651,58 +652,32 @@ class MainActivity : Activity() {
         parent.addView(tile, LinearLayout.LayoutParams(dp(44), dp(44)))
     }
 
-    private fun addLoudnessSegment(parent: LinearLayout) {
-        val group = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            background = rounded(R.color.segment_surface, 13)
-            setPadding(dp(4), dp(4), dp(4), dp(4))
-        }
-        fun choice(enabled: Boolean, title: String, description: String) {
-            val selected = AppPreferences.loudnessBoostEnabled(this) == enabled
-            val option = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                minimumHeight = dp(68)
-                setPadding(dp(8), dp(8), dp(10), dp(8))
-                background = rounded(if (selected) R.color.surface else R.color.segment_surface, 10)
-                isClickable = true
-                isFocusable = true
-                isSelected = selected
-                contentDescription = if (selected) getString(R.string.selected_format, "$title. $description") else "$title. $description"
-                setOnClickListener {
-                    AppPreferences.setLoudnessBoostEnabled(this@MainActivity, enabled)
-                    boostAvailable = speechController?.setBoostEnabled(enabled)
-                    sendBroadcast(Intent(SpeechActions.SET_LOUDNESS_BOOST).setPackage(packageName)
-                        .putExtra(SpeechActions.EXTRA_BOOST_ENABLED, enabled))
-                    showScreen(currentScreen)
+    private fun addLoudnessSlider(parent: LinearLayout) {
+        val value = AppPreferences.loudnessBoostDb(this)
+        val label = makeTextView("${getString(R.string.speech_boost_level)}: ${value} dB", 16f, R.color.ink, medium = true)
+        parent.addView(label, margin(top = 10, bottom = 4))
+        val slider = SeekBar(this).apply {
+            max = AppPreferences.MAX_LOUDNESS_BOOST_DB / AppPreferences.LOUDNESS_BOOST_STEP_DB
+            progress = value / AppPreferences.LOUDNESS_BOOST_STEP_DB
+            contentDescription = getString(R.string.speech_boost_level)
+            minimumHeight = dp(52)
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                    val gainDb = progress * AppPreferences.LOUDNESS_BOOST_STEP_DB
+                    label.text = "${getString(R.string.speech_boost_level)}: ${gainDb} dB"
+                    if (fromUser) {
+                        AppPreferences.setLoudnessBoostDb(this@MainActivity, gainDb)
+                        boostAvailable = speechController?.setBoostDb(gainDb)
+                        sendBroadcast(Intent(SpeechActions.SET_LOUDNESS_BOOST).setPackage(packageName)
+                            .putExtra(SpeechActions.EXTRA_BOOST_DB, gainDb))
+                    }
                 }
-            }
-            val radio = RadioButton(this).apply {
-                isChecked = selected
-                isClickable = false
-                isFocusable = false
-                contentDescription = null
-            }
-            option.addView(radio, LinearLayout.LayoutParams(dp(48), dp(48)))
-            val copy = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-            addText(copy, title, 16f, R.color.ink, medium = true, bottom = 1)
-            addText(copy, description, 13f, R.color.muted_ink, bottom = 0)
-            option.addView(copy, LinearLayout.LayoutParams(0, -2, 1f))
-            group.addView(option, LinearLayout.LayoutParams(-1, -2).apply {
-                if (group.childCount > 0) topMargin = dp(4)
+                override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
+                override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
             })
         }
-        choice(
-            false,
-            getString(R.string.normal_sound),
-            getString(R.string.normal_sound_description)
-        )
-        choice(
-            true,
-            getString(R.string.boosted_sound),
-            getString(R.string.boosted_sound_description)
-        )
-        parent.addView(group)
+        parent.addView(slider)
+        addText(parent, getString(R.string.speech_boost_range), 13f, R.color.muted_ink, top = 2)
     }
 
     private fun addLanguageChoice(parent: LinearLayout, language: String, label: String) {
