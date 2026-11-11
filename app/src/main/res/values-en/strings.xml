@@ -94,7 +94,6 @@
     <string name="apply_filters">Apply filters</string>
     <string name="invalid_amount_range">Enter valid amounts and make sure the minimum is not greater than the maximum.</string>
     <string name="no_matching_payments">No payments match these filters.</string>
-    <string name="received_at">Received: %1$s</string>
     <string name="confirm_clear_title">Clear payment history?</string>
     <string name="confirm_clear_message">All payment records saved on this phone will be permanently deleted.</string>
     <string name="confirm_clear_action">Clear history</string>
@@ -128,7 +127,6 @@
     <string name="access_step_body">Enable notification access to detect payment notifications.</string>
     <string name="enable_short">Enable</string>
     <string name="latest_payments">Recent payments</string>
-    <string name="received_label">Received</string>
     <string name="settings_eyebrow">MAKE IT YOURS</string>
     <string name="settings_title">Settings</string>
     <string name="announcement_description">Speak received payments in Hindi</string>

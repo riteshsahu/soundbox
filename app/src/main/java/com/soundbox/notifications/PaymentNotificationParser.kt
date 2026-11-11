@@ -27,6 +27,8 @@ object PaymentNotificationParser {
             "\\bdeposit(?:ed)? from\\b|\\badded to (?:your )?account\\b|" +
             "\\bmoney received\\b|\\bpayment received\\b|" +
             "\\bpaid (?:to )?you\\b|\\bsent (?:to )?you\\b|" +
+            "\\bhas sent\\b.{0,45}\\bto your (?:bank )?account\\b|" +
+            "\\bhas paid\\b.{0,45}\\bto your (?:bank )?account\\b|" +
             "\\btransferred from\\b|\\btransfer from\\b|" +
             "प्राप्त(?:\\s+हो)?\\s+(?:हुआ|हुई|हुए|गया|गई|गए|गयी|गये)|" +
             "मिला|मिली|मिले|मिल गए|मिल गई|मिल गया|" +
@@ -35,9 +37,7 @@ object PaymentNotificationParser {
     )
 
     private val disqualifyingPattern = Regex(
-        "(?iu)(?:\\b(sent|paid)\\b(?!\\s+(?:to\\s+)?you\\b)|" +
-            "\\b(sent|paid)\\s+(?:to|for)\\s+(?!you\\b)" +
-            "|\\byou\\s+(?:sent|paid)\\b|\\bdebited\\b|\\bpending\\b|" +
+        "(?iu)(?:\\bdebited\\b|\\bdebit\\b|\\bpending\\b|" +
             "\\bfailed\\b|\\bfailure\\b|\\bdeclined\\b|\\brejected\\b|" +
             "\\bunsettled\\b|\\bunconfirmed\\b|\\bunsuccessful\\b|" +
             "\\bnot settled\\b|\\bnot completed\\b|\\bnot credited\\b|" +
@@ -49,21 +49,25 @@ object PaymentNotificationParser {
             "\\bprocessing\\b|\\binitiated\\b|\\brequested\\b|" +
             "\\bwill be received\\b|\\bto be received\\b|\\bwill receive\\b|" +
             "\\bwill be credited\\b|\\bto be credited\\b|\\bwill be deposited\\b|" +
-            "प्राप्त नहीं|मिला नहीं|मिली नहीं|मिले नहीं|असफल|विफल|लंबित|रद्द|वापस|रिवर्स|भेजा|भेजे|" +
+            "प्राप्त नहीं|मिला नहीं|मिली नहीं|मिले नहीं|असफल|विफल|लंबित|रद्द|वापस|रिवर्स|" +
             "प्राप्त करें|प्राप्त करने|जमा करें|जमा करने|मिलेगा|मिलेगी|मिलेंगे|" +
             "जमा नहीं|सफल नहीं|पूरा नहीं|अस्वीकृत|कैशबैक|इनाम|" +
             "बोनस|रिचार्ज|रीचार्ज|कूपन|उपहार|" +
-            "डेबिट|कटा|निकाला|भुगतान किया)"
+            "डेबिट|कटा|निकाला)"
     )
 
     fun parse(packageName: String, title: String?, text: String?): ParsedPayment? {
         val provider = PaymentProvider.fromPackageName(packageName) ?: return null
-        val combined = listOfNotNull(title, text).joinToString(" ").trim()
+        val titleText = title.orEmpty().trim()
+        val bodyText = text.orEmpty().trim()
+        val combined = listOf(titleText, bodyText).filter { it.isNotEmpty() }.joinToString(" ")
         if (combined.isEmpty()) return null
 
         val normalized = combined.lowercase(Locale.ROOT)
         if (disqualifyingPattern.containsMatchIn(normalized)) return null
-        if (!incomingPattern.containsMatchIn(normalized)) return null
+        val titleIndicatesIncoming = incomingPattern.containsMatchIn(titleText.lowercase(Locale.ROOT))
+        val bodyIndicatesIncoming = incomingPattern.containsMatchIn(bodyText.lowercase(Locale.ROOT))
+        if (!titleIndicatesIncoming && !bodyIndicatesIncoming) return null
 
         val amounts = (prefixedAmountPattern.findAll(normalized) +
             suffixedAmountPattern.findAll(normalized))

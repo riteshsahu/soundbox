@@ -43,7 +43,6 @@ import com.soundbox.speech.SpeechActions
 import java.util.Locale
 import java.util.Calendar
 import java.util.Date
-import java.text.DateFormat
 import java.text.NumberFormat
 import java.math.BigDecimal
 import java.math.RoundingMode
@@ -1198,33 +1197,29 @@ class MainActivity : Activity() {
                 !compact -> setPadding(0, dp(2), 0, dp(2))
             }
         }
-        val providerInitial = when (record.sourceApp) {
-            "Google Pay" -> "G"
-            "PhonePe" -> "पे"
-            else -> "P"
-        }
-        val providerColor = when (record.sourceApp) {
-            "Google Pay" -> R.color.source_google
-            "PhonePe" -> R.color.source_phonepe
-            else -> R.color.source_paytm
+        val providerIcon = when (record.sourceApp) {
+            "Google Pay" -> R.drawable.ic_provider_google
+            "PhonePe" -> R.drawable.ic_provider_phonepe
+            "Paytm" -> R.drawable.ic_provider_paytm
+            else -> R.drawable.ic_provider_generic
         }
         val providerSurface = when (record.sourceApp) {
             "Google Pay" -> R.color.source_google_surface
             "PhonePe" -> R.color.source_phonepe_surface
-            else -> R.color.source_paytm_surface
+            "Paytm" -> R.color.source_paytm_surface
+            else -> R.color.history_count_surface
         }
-        val receivedMark = TextView(this).apply {
-            text = providerInitial
-            textSize = if (record.sourceApp == "PhonePe") 17f else 20f
-            gravity = Gravity.CENTER
-            setTextColor(getColor(providerColor))
+        val receivedMark = ImageView(this).apply {
+            setImageResource(providerIcon)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            setPadding(dp(7), dp(7), dp(7), dp(7))
             background = rounded(providerSurface, 13)
             contentDescription = getString(R.string.source_app_accessibility, record.sourceApp)
         }
         row.addView(receivedMark, LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginEnd = dp(12) })
         val details = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         addText(details, record.sourceApp, 16f, R.color.ink, medium = true, bottom = 2)
-        addText(details, getString(R.string.received_at, formatDateTime(record.receivedAtMillis)), 14f, R.color.muted_ink, bottom = 0)
+        addText(details, formatDateTime(record.receivedAtMillis), 14f, R.color.muted_ink, bottom = 0)
         row.addView(details, LinearLayout.LayoutParams(0, -2, 1f))
         val amountColumn = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -1239,7 +1234,6 @@ class MainActivity : Activity() {
             contentDescription = getString(R.string.received_amount_accessibility, formatAmount(record.amountPaise))
         }
         amountColumn.addView(amount)
-        amountColumn.addView(makeTextView(getString(R.string.received_label), 12f, R.color.muted_ink))
         row.addView(amountColumn)
         item.addView(row)
     }
@@ -1456,17 +1450,15 @@ class MainActivity : Activity() {
         return formatter.format(BigDecimal.valueOf(amountPaise, 2))
     }
 
-    private fun formatDate(timestampMillis: Long): String = DateFormat
-        .getDateInstance(DateFormat.MEDIUM, Locale.forLanguageTag(getUiLanguage()))
-        .format(Date(timestampMillis))
+    private fun formatDate(timestampMillis: Long): String = java.text.SimpleDateFormat(
+        "d MMMM yyyy",
+        Locale.forLanguageTag(getUiLanguage())
+    ).format(Date(timestampMillis))
 
-    private fun formatDateTime(timestampMillis: Long): String = DateFormat
-        .getDateTimeInstance(
-            DateFormat.MEDIUM,
-            DateFormat.SHORT,
-            Locale.forLanguageTag(getUiLanguage())
-        )
-        .format(Date(timestampMillis))
+    private fun formatDateTime(timestampMillis: Long): String = java.text.SimpleDateFormat(
+        "d MMMM yyyy, h:mm a",
+        Locale.forLanguageTag(getUiLanguage())
+    ).format(Date(timestampMillis))
 
     private fun openHindiVoiceSettings() {
         voiceSettingsOpened = true

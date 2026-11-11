@@ -94,7 +94,6 @@
     <string name="apply_filters">फ़िल्टर लागू करें</string>
     <string name="invalid_amount_range">रकम सही लिखें और जाँचें कि न्यूनतम रकम अधिकतम से बड़ी न हो।</string>
     <string name="no_matching_payments">इन फ़िल्टर से कोई भुगतान नहीं मिला।</string>
-    <string name="received_at">मिला: %1$s</string>
     <string name="confirm_clear_title">भुगतान इतिहास मिटाएँ?</string>
     <string name="confirm_clear_message">फ़ोन पर रखे सभी भुगतान रिकॉर्ड हमेशा के लिए मिट जाएँगे।</string>
     <string name="confirm_clear_action">इतिहास मिटाएँ</string>
@@ -128,7 +127,6 @@
     <string name="access_step_body">भुगतान सूचनाएँ पहचानने के लिए सूचना ऐक्सेस चालू करें।</string>
     <string name="enable_short">चालू करें</string>
     <string name="latest_payments">हाल के भुगतान</string>
-    <string name="received_label">प्राप्त</string>
     <string name="settings_eyebrow">अपनी पसंद के अनुसार</string>
     <string name="settings_title">सेटिंग्स</string>
     <string name="announcement_description">प्राप्त भुगतान की आवाज़ हिंदी में सुनें</string>

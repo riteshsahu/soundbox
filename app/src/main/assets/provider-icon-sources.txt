@@ -1,0 +1,8 @@
+Bundled provider marks:
+
+Google Pay: user-provided google-icon-logo-svgrepo-com.svg (download attribution in source file: SVG Repo)
+PhonePe: user-provided phonepe-icon.svg
+Paytm: https://commons.wikimedia.org/wiki/File:Paytm_Logo_(standalone).svg
+
+The SVGs were rasterized to PNG for Android display. The generic fallback icon
+is an original local vector drawable and is used for unrecognized source labels.

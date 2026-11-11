@@ -103,6 +103,39 @@ class PaymentNotificationParserTest {
     }
 
     @Test
+    fun acceptsPhonePeHasSentAmountToYourBankAccountWording() {
+        val parsed = PaymentNotificationParser.parse(
+            PaymentProvider.PHONEPE.packageName,
+            "Money received",
+            "A sender has sent ₹1 to your bank account"
+        )
+        assertEquals(100L, parsed?.amountPaise)
+    }
+
+    @Test
+    fun incomingSignalInEitherFieldIsNotVetoedBySentWordingInTheOther() {
+        val positiveTitle = PaymentNotificationParser.parse(
+            PaymentProvider.PHONEPE.packageName,
+            "Money received",
+            "A sender has sent ₹1 to your bank account"
+        )
+        assertEquals(100L, positiveTitle?.amountPaise)
+
+        val positiveBody = PaymentNotificationParser.parse(
+            PaymentProvider.PHONEPE.packageName,
+            "A sender has sent ₹1",
+            "Money received"
+        )
+        assertEquals(100L, positiveBody?.amountPaise)
+    }
+
+    @Test
+    fun hardFailureStatusStillOverridesIncomingWording() {
+        assertRejected("₹500 received, but payment failed")
+        assertRejected("₹500 received, but payment is pending")
+    }
+
+    @Test
     fun rejectsOutgoingPaymentAndBareReferenceNumbers() {
         assertRejected("₹500 paid to merchant")
         assertRejected("₹500 sent to another account")
