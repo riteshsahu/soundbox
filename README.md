@@ -1,35 +1,41 @@
 # SoundBox
 
-SoundBox is a small, native Android app for announcing confidently identified incoming payments in Hindi and keeping a private three-month history on the device.
+SoundBox is a small native Android app that can announce confidently identified incoming UPI payment notifications in Hindi and keep a private, on-device payment history.
 
-## Milestones
+## What it does
 
-**Milestone 1 — Foundation:** The runnable Kotlin app shell has Home, Setup, and Payment History screens. The visible UI can be switched between Hindi and English, with English as the default; the choice is saved locally.
+- Listens only to notifications from the exact Google Pay, PhonePe, and Paytm package IDs in [`PaymentProviderAllowlist.kt`](app/src/main/java/com/soundbox/notifications/PaymentProviderAllowlist.kt).
+- Announces and records only payments the conservative parser identifies as successful incoming credits. Ambiguous, debit, pending, failed, reversed, amount-only, unrelated, and non-allowlisted notifications are ignored.
+- Uses the installed Hindi text-to-speech voice. Announcements are off until enabled by the user.
+- Stores only the amount, received timestamp, and source app. History is kept locally, pruned after three months, and excluded from Android backup.
+- Calculates today's total using the device's local date, independently of history filters.
+- Offers an optional, bounded speech loudness boost when Android supports it. It applies to SoundBox's audio only and cannot exceed the device's hardware limits.
 
-**Milestone 2 — Speech and listener:** The app checks OS notification-listener access, requires an installed offline Hindi TTS voice, offers Hindi test speech, and listens only to exact Google Pay, PhonePe, and Paytm package IDs. Announcements are off until explicitly enabled. The parser is deliberately conservative and uses synthetic tests. Speech stays Hindi regardless of UI language.
+Notifications are convenience signals, not proof that funds have settled. Provider package IDs and synthetic parser tests do not establish that a provider's current notification format is supported. Validate real notifications on the intended device before relying on them; do not use real notification text as a test fixture.
 
-**Milestone 3 — History and totals:** Accepted credits are stored in a private SQLite database using only amount in paise, received timestamp, and source app. It prunes entries older than three calendar months, suppresses likely duplicates across restarts using only source, amount, and nearby timestamp, computes today’s total using the device’s local date, and offers date, source, and amount filters plus a confirmed clear action. Today’s headline total is independent of history filters.
+## Privacy
 
-**Milestone 4 — Speech loudness:** Setup offers a user controlled speech boost from 0 to +48 dB in 6 dB steps. The app attempts a `LoudnessEnhancer` effect on SoundBox’s own Hindi TTS audio session. If Android or the device cannot provide the effect, speech continues at normal level. This does not change system volume, and the audible result depends on the device’s hardware. Android does not publish a universal maximum gain for this effect; the selected target gain may compress peaks differently by device. The effect has not yet been validated on the Redmi Note 8 Pro.
+The app has no internet permission, account, backend, analytics, ads, or remote speech service. Android notification access is granted by the user in system settings and may expose notifications beyond these payment apps to the listener service; SoundBox immediately ignores every package outside its exact allowlist. It does not retain or log notification text, payer/account details, UPI IDs, phone numbers, or transaction/reference IDs.
 
-Notification access is a user-enabled Android system setting; the app does not declare a `uses-permission` for it and does not request `POST_NOTIFICATIONS`. Android backup is disabled in the manifest. The database contains only amount in paise, received timestamp, and source app. The listener checks the exact package allowlist before accessing notification content, and it does not log notification text. No network permission or cloud service is included.
+The manifest disables Android backup. Local history uses private app storage and device protection; it does not use a separate database-encryption layer. See [`PROJECT_BRIEF.md`](PROJECT_BRIEF.md) for the detailed product and privacy requirements.
 
-The database relies on Android’s private app storage and device protection rather than a separate database-encryption layer. This keeps local recovery and migration straightforward; the database is not copied to Android backups.
+## Build and test
 
-The allowlist is centralized in `PaymentProviderAllowlist.kt`. Current IDs are Google Pay `com.google.android.apps.nbu.paisa.user`, PhonePe `com.phonepe.app`, and Paytm `net.one97.paytm`. Confirm the installed app’s package ID on the target phone before changing an entry. Package IDs alone do not establish provider support; validate notifications on the Redmi only with explicit authorization.
-
-To verify an ID, check the package name in the official app’s Google Play listing URL (`id=...`) and confirm that the phone has that same official app installed. If an ID changes, update only the matching enum entry in `PaymentProviderAllowlist.kt` and add/update synthetic parser cases before on-device validation. References: [Google Pay for India package documentation](https://developers.google.com/pay/india/api/android/in-app-payments), [PhonePe Google Play listing](https://play.google.com/store/apps/details?id=com.phonepe.app), [Paytm Google Play listing](https://play.google.com/store/apps/details?id=net.one97.paytm).
-
-The parser rejects non-allowlisted packages, ambiguous direction, debit/pending/failure/reversal wording, missing or multiple amounts, and amounts without a currency marker. It does not store or log notification text. Test with `./gradlew test`; tests use synthetic text only.
-
-## Build
-
-Open this folder in Android Studio or run:
+Use the checked-in Gradle wrapper and Java 17:
 
 ```sh
 ./gradlew assembleDebug
+./gradlew test
 ```
 
-The project uses Android Gradle Plugin 9.5.0 with its built-in Kotlin support, Gradle 9.6.0, Java 17, compile SDK 37, and target SDK 35. The minimum Android version is Android 6.0 (API 23); the target Redmi Note 8 Pro runs Android 11 (API 30).
+Open the project in Android Studio to install it on a development device. The app requires Android 6.0 (API 23) or newer. It does not request `POST_NOTIFICATIONS`; notification-listener access must be enabled by the user in Android settings. Hindi speech requires an installed on-device Hindi TTS voice.
 
-Focused synthetic tests run with `./gradlew test`. They cover parser decisions, Hindi amount wording, retention cutoff, local-day totals, and deduplication. No captured financial notifications are used as fixtures.
+Unit tests use synthetic text only. Validate real notifications only on a device with its owner's explicit authorization.
+
+## Current status
+
+The repository includes the app foundation, setup/home/history screens, conservative notification parsing, local history rules, Hindi speech, and optional app-owned loudness enhancement. Provider notification formats, speech behavior, and loudness boost still require validation on each intended device. SoundBox does not claim bank verification or universal provider compatibility.
+
+## License
+
+The SoundBox source code is available under the MIT License; see [`LICENSE`](LICENSE). Bundled provider logos are third-party brand assets and are not relicensed by the MIT license. Their source notes are in [`provider-icon-sources.txt`](app/src/main/assets/provider-icon-sources.txt); the marks remain subject to their owners' rights and applicable source terms.
